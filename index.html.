@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chelenqo Digital Examination System</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      margin: 0;
+      color: #222;
+    }
+
+    header {
+      background: #075e54;
+      color: white;
+      text-align: center;
+      padding: 25px 12px;
+    }
+
+    main {
+      max-width: 600px;
+      margin: 25px auto;
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 22px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px #0001;
+    }
+
+    input, select, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px;
+      margin: 8px 0;
+      font-size: 16px;
+      border-radius: 6px;
+    }
+
+    input, select {
+      border: 1px solid #bbb;
+    }
+
+    button {
+      background: #075e54;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #555;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Chelenqo Secondary School</h1>
+    <p>Digital Examination System</p>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Student Examination Portal</h2>
+      <p>Enter your information to get started.</p>
+
+      <form id="studentForm">
+        <label for="studentName">Full Name</label>
+        <input id="studentName" required
+               placeholder="Enter your full name">
+
+        <label for="studentId">Student ID</label>
+        <input id="studentId" required
+               placeholder="Enter your student ID">
+
+        <label for="grade">Grade</label>
+        <select id="grade" required>
+          <option value="">Select grade</option>
+          <option value="9">Grade 9</option>
+          <option value="10">Grade 10</option>
+          <option value="11">Grade 11</option>
+          <option value="12">Grade 12</option>
+        </select>
+
+        <label for="section">Section</label>
+        <input id="section" required
+               placeholder="Enter your section">
+
+        <button type="submit">Continue</button>
+      </form>
+
+      <p id="message" role="status"></p>
+    </div>
+  </main>
+
+  <footer>
+    &copy; 2026 Chelenqo Secondary School
+  </footer>
+
+  <script>
+    document.getElementById("studentForm")
+      .addEventListener("submit", function(event) {
+        event.preventDefault();
+
+        const name =
+          document.getElementById("studentName").value.trim();
+
+        const studentId =
+          document.getElementById("studentId").value.trim();
+
+        const grade =
+          document.getElementById("grade").value;
+
+        const section =
+          document.getElementById("section").value.trim();
+
+        if (!name || !studentId || !grade || !section) {
+          return;
+        }
+
+        document.getElementById("message").textContent =
+          "Welcome, " + name +
+          "! Your student information has been entered. " +
+          "Examination access will be added in the next step.";
+      });
+  </script>
+</body>
+</html>
