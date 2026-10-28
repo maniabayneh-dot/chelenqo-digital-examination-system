@@ -1,13 +1,12 @@
 <footer>
-    &copy; 2026 Chelenqo Secondary School
+&copy; 2026 Chelenqo Secondary School
 </footer>
 
-<script>
-document.getElementById("studentForm")
+<script>document.getElementById("studentForm")
 .addEventListener("submit", function(event) {
     event.preventDefault();
 
-    const name = document.getElementById("studentName").value.trim();
+    const name document.getElementById("studentName").value.trim();
     const studentId = document.getElementById("studentId").value.trim();
     const grade = document.getElementById("grade").value;
     const section = document.getElementById("section").value.trim();
