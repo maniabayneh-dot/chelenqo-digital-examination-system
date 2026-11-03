@@ -1,0 +1,484 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chelenqo Digital Examination System</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f1f5f9;
+  color: #172554;
+}
+
+header {
+  background: #123c69;
+  color: white;
+  text-align: center;
+  padding: 22px 12px;
+}
+
+header h1 { margin: 5px; font-size: 23px; }
+header p { margin: 5px; }
+
+.container {
+  max-width: 750px;
+  margin: 25px auto;
+  padding: 15px;
+}
+
+.card {
+  background: white;
+  padding: 22px;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px #00000012;
+  margin-bottom: 18px;
+}
+
+input, select {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  margin: 12px 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font-size: 16px;
+}
+
+button {
+  padding: 12px 18px;
+  border: none;
+  border-radius: 7px;
+  background: #1769aa;
+  color: white;
+  font-size: 15px;
+  cursor: pointer;
+  margin: 5px 3px;
+}
+
+button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.primary { background: #15803d; }
+.danger { background: #b91c1c; }
+
+.hidden { display: none; }
+
+.question {
+  font-size: 19px;
+  font-weight: bold;
+  margin-bottom: 18px;
+}
+
+.option {
+  display: block;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: 13px;
+  margin: 10px 0;
+  cursor: pointer;
+}
+
+.option input {
+  display: inline-block;
+  width: auto;
+  margin-right: 10px;
+}
+
+.info {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-weight: bold;
+}
+
+#timer { color: #b91c1c; }
+
+#message { color: #b91c1c; }
+
+footer {
+  text-align: center;
+  padding: 20px;
+  color: #64748b;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>CHELENQO SECONDARY SCHOOL</h1>
+  <p>Digital Examination System</p>
+  <p>Grade 12 Chemistry Examination</p>
+</header>
+
+<main class="container">
+
+<!-- STUDENT REGISTRATION -->
+
+<section id="registration" class="card">
+  <h2>Student Registration</h2>
+  <p>Enter your information to begin.</p>
+
+  <form id="studentForm">
+    <input id="studentName"
+      placeholder="Student full name" required>
+
+    <input id="studentId"
+      placeholder="Student ID" required>
+
+    <select id="grade" required>
+      <option value="">Select Grade</option>
+      <option value="12">Grade 12</option>
+    </select>
+
+    <input id="section"
+      placeholder="Section" required>
+
+    <input id="schoolCode"
+      placeholder="School examination code" required>
+
+    <button type="submit" class="primary">
+      Start Examination
+    </button>
+  </form>
+
+  <p id="message" role="alert"></p>
+</section>
+
+<!-- EXAMINATION -->
+
+<section id="exam" class="card hidden">
+
+  <div class="info">
+    <span id="studentDisplay"></span>
+    <span id="timer">60:00</span>
+  </div>
+
+  <hr>
+
+  <div class="info">
+    <span id="questionNumber"></span>
+    <span id="answeredCount"></span>
+  </div>
+
+  <p id="questionText" class="question"></p>
+
+  <div id="options"></div>
+
+  <hr>
+
+  <button id="previousBtn">Previous</button>
+  <button id="nextBtn">Next</button>
+  <button id="submitBtn" class="danger">
+    Submit Examination
+  </button>
+
+</section>
+
+<!-- RESULT -->
+
+<section id="result" class="card hidden">
+  <h2>Examination Result</h2>
+
+  <p id="resultStudent"></p>
+  <p id="score"></p>
+  <p id="percentage"></p>
+  <p id="resultMessage"></p>
+
+  <button onclick="location.reload()">
+    Return to Home
+  </button>
+</section>
+
+</main>
+
+<footer>
+  &copy; 2026 Chelenqo Secondary School
+</footer>
+
+<script>
+
+// ==================================
+// 1. CHEMISTRY QUESTIONS
+// ==================================
+
+const questions = [
+ {
+  question: "Why do atoms share electrons in covalent bonds?",
+  options: [
+   "To achieve a more stable electron configuration",
+   "To increase their atomic mass",
+   "To become positively charged",
+   "To lose all their electrons"
+  ],
+  answer: 0
+ },
+
+ {
+  question: "Which of the following is a strong acid?",
+  options: [
+   "CH3COOH",
+   "HCl",
+   "H2CO3",
+   "HF"
+  ],
+  answer: 1
+ },
+
+ {
+  question: "What is the pH of a neutral solution at 25°C?",
+  options: ["1", "5", "7", "14"],
+  answer: 2
+ },
+
+ {
+  question: "Which ion makes an aqueous NaF solution basic?",
+  options: [
+   "Na+",
+   "F-",
+   "H+",
+   "Cl-"
+  ],
+  answer: 1
+ },
+
+ {
+  question: "Which theory explains molecular shape?",
+  options: [
+   "Kinetic molecular theory",
+   "VSEPR theory",
+   "Collision theory",
+   "Atomic theory"
+  ],
+  answer: 1
+ }
+];
+
+// ==================================
+// 2. VARIABLES
+// ==================================
+
+let student = {};
+let currentQuestion = 0;
+let answers = [];
+let timeLeft = 60 * 60;
+let timerInterval = null;
+let submitted = false;
+
+// ==================================
+// 3. STUDENT REGISTRATION
+// ==================================
+
+document.getElementById("studentForm")
+.addEventListener("submit", function(event) {
+
+ event.preventDefault();
+
+ student = {
+  name: document.getElementById("studentName").value.trim(),
+  id: document.getElementById("studentId").value.trim(),
+  grade: document.getElementById("grade").value,
+  section: document.getElementById("section").value.trim(),
+  schoolCode: document.getElementById("schoolCode").value.trim()
+ };
+
+ if (!Object.values(student).every(Boolean)) {
+  document.getElementById("message").textContent =
+   "Please complete all registration fields.";
+  return;
+ }
+
+ answers = new Array(questions.length).fill(null);
+
+ document.getElementById("registration")
+ .classList.add("hidden");
+
+ document.getElementById("exam")
+ .classList.remove("hidden");
+
+ document.getElementById("studentDisplay").textContent =
+  student.name + " | Grade " + student.grade;
+
+ renderQuestion();
+ startTimer();
+
+});
+
+// ==================================
+// 4. DISPLAY QUESTIONS
+// ==================================
+
+function renderQuestion() {
+
+ const q = questions[currentQuestion];
+
+ document.getElementById("questionNumber").textContent =
+  "Question " + (currentQuestion + 1) +
+  " of " + questions.length;
+
+ document.getElementById("answeredCount").textContent =
+  "Answered: " + answers.filter(a => a !== null).length;
+
+ document.getElementById("questionText").textContent =
+  q.question;
+
+ const options = document.getElementById("options");
+ options.innerHTML = "";
+
+ q.options.forEach((option, index) => {
+
+  const label = document.createElement("label");
+  label.className = "option";
+
+  const radio = document.createElement("input");
+  radio.type = "radio";
+  radio.name = "answer";
+  radio.value = index;
+  radio.checked = answers[currentQuestion] === index;
+
+  radio.addEventListener("change", function() {
+   answers[currentQuestion] = index;
+   renderQuestion();
+  });
+
+  label.appendChild(radio);
+  label.appendChild(
+   document.createTextNode(
+    String.fromCharCode(65 + index) + ". " + option
+   )
+  );
+
+  options.appendChild(label);
+ });
+
+ document.getElementById("previousBtn").disabled =
+  currentQuestion === 0;
+
+ document.getElementById("nextBtn").disabled =
+  currentQuestion === questions.length - 1;
+}
+
+// ==================================
+// 5. QUESTION NAVIGATION
+// ==================================
+
+document.getElementById("previousBtn")
+.addEventListener("click", function() {
+
+ if (currentQuestion > 0) {
+  currentQuestion--;
+  renderQuestion();
+ }
+
+});
+
+document.getElementById("nextBtn")
+.addEventListener("click", function() {
+
+ if (currentQuestion < questions.length - 1) {
+  currentQuestion++;
+  renderQuestion();
+ }
+
+});
+
+// ==================================
+// 6. EXAMINATION TIMER
+// ==================================
+
+function startTimer() {
+
+ timerInterval = setInterval(function() {
+
+  timeLeft--;
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+
+  document.getElementById("timer").textContent =
+   String(minutes).padStart(2, "0") + ":" +
+   String(seconds).padStart(2, "0");
+
+  if (timeLeft <= 0) {
+   finishExam();
+  }
+
+ }, 1000);
+
+}
+
+// ==================================
+// 7. AUTOMATIC MARKING
+// ==================================
+
+document.getElementById("submitBtn")
+.addEventListener("click", function() {
+
+ const unanswered =
+  answers.filter(a => a === null).length;
+
+ if (unanswered > 0) {
+  const confirmSubmit = confirm(
+   unanswered + " questions are unanswered. Submit anyway?"
+  );
+
+  if (!confirmSubmit) return;
+ }
+
+ finishExam();
+
+});
+
+function finishExam() {
+
+ if (submitted) return;
+ submitted = true;
+
+ clearInterval(timerInterval);
+
+ let marks = 0;
+
+ questions.forEach((q, index) => {
+  if (answers[index] === q.answer) {
+   marks++;
+  }
+ });
+
+ const percentage =
+  (marks / questions.length) * 100;
+
+ document.getElementById("exam")
+ .classList.add("hidden");
+
+ document.getElementById("result")
+ .classList.remove("hidden");
+
+ document.getElementById("resultStudent").textContent =
+  "Student: " + student.name +
+  " | ID: " + student.id;
+
+ document.getElementById("score").textContent =
+  "Your score: " + marks + " / " + questions.length;
+
+ document.getElementById("percentage").textContent =
+  "Percentage: " + percentage.toFixed(1) + "%";
+
+ document.getElementById("resultMessage").textContent =
+  "Examination completed successfully.";
+
+}
+
+</script>
+
+</body>
+</html>
