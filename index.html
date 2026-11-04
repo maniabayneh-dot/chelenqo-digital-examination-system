@@ -118,7 +118,29 @@ footer {
 <header>
   <h1>CHELENQO SECONDARY SCHOOL</h1>
   <p>Digital Examination System</p>
-  <p>Grade 12 Chemistry Examination</p>
+  <p>
+<label for="grade">Grade</label>
+<select id="grade" required>
+  <option value="">Select grade</option>
+  <option value="9">Grade 9</option>
+  <option value="10">Grade 10</option>
+  <option value="11">Grade 11</option>
+  <option value="12">Grade 12</option>
+</select>
+
+<label for="section">Section</label>
+<input
+  type="text"
+  id="section"
+  placeholder="Enter your section"
+  required
+/>
+
+<label for="subject">Subject</label>
+<select id="subject" required>
+  <option value="">First select your grade</option>
+</select>
+ </p>
 </header>
 
 <main class="container">
