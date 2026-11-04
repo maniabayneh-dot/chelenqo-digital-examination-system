@@ -114,6 +114,78 @@ footer {
 </head>
 
 <body>
+const subjectsByGrade = {
+  "9": [
+    "Mathematics",
+    "English",
+    "Physics",
+    "Chemistry",
+    "Biology",
+    "Geography",
+    "History",
+    "Civics",
+    "ICT",
+    "Afaan Oromo",
+    "Amharic"
+  ],
+
+  "10": [
+    "Mathematics",
+    "English",
+    "Physics",
+    "Chemistry",
+    "Biology",
+    "Geography",
+    "History",
+    "Civics",
+    "ICT",
+    "Afaan Oromo",
+    "Amharic"
+  ],
+
+  "11": [
+    "Mathematics",
+    "English",
+    "Physics",
+    "Chemistry",
+    "Biology",
+    "Geography",
+    "History",
+    "Economics",
+    "ICT"
+  ],
+
+  "12": [
+    "Mathematics",
+    "English",
+    "Physics",
+    "Chemistry",
+    "Biology",
+    "Geography",
+    "History",
+    "Economics",
+    "ICT"
+  ]
+};
+
+const gradeSelect = document.getElementById("grade");
+const subjectSelect = document.getElementById("subject");
+
+gradeSelect.addEventListener("change", function () {
+  const selectedGrade = this.value;
+
+  subjectSelect.innerHTML =
+    '<option value="">Select subject</option>';
+
+  const subjects = subjectsByGrade[selectedGrade] || [];
+
+  subjects.forEach(function (subject) {
+    const option = document.createElement("option");
+    option.value = subject;
+    option.textContent = subject;
+    subjectSelect.appendChild(option);
+  });
+});
 
 <header>
   <h1>CHELENQO SECONDARY SCHOOL</h1>
