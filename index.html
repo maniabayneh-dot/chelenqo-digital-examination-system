@@ -1,460 +1,187 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#123c69">
 <title>Chelenqo Digital Examination System</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--navy:#123c69;--blue:#1769aa;--green:#15803d;--red:#b91c1c;--bg:#f1f5f9;--ink:#172554}
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}
-header{background:var(--navy);color:white;text-align:center;padding:22px 12px}
-header h1{margin:5px;font-size:clamp(20px,4vw,28px)}
-header p{margin:6px}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--navy);color:white;text-align:center;padding:22px 12px}header h1{margin:5px;font-size:clamp(20px,4vw,28px)}
 nav{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:12px;background:#e2e8f0}
 button{border:0;border-radius:7px;padding:12px 16px;background:var(--blue);color:white;font-size:15px;cursor:pointer;margin:3px}
-button:disabled{background:#94a3b8;cursor:not-allowed}
-button.primary{background:var(--green)}
-button.danger{background:var(--red)}
-button.secondary{background:#475569}
-.container{max-width:900px;margin:22px auto;padding:0 14px}
-.card{background:white;padding:20px;border-radius:12px;box-shadow:0 3px 12px #00000012;margin-bottom:18px}
-.hidden{display:none!important}
-label{display:block;font-weight:600;margin:12px 0 5px}
+button:disabled{background:#94a3b8;cursor:not-allowed}.primary{background:var(--green)}.danger{background:var(--red)}.secondary{background:#475569}
+.container{max-width:960px;margin:22px auto;padding:0 14px}.card{background:white;padding:20px;border-radius:12px;box-shadow:0 3px 12px #00000012;margin-bottom:18px}
+.hidden{display:none!important}label{display:block;font-weight:600;margin:12px 0 5px}
 input,select,textarea{display:block;width:100%;padding:12px;margin:6px 0 12px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;background:white}
-textarea{min-height:220px;font-family:monospace;font-size:14px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-.info{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-weight:bold}
-#timer{color:var(--red);font-size:20px}
-.question{font-size:19px;font-weight:bold;margin:20px 0}
-.option{display:block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:7px;padding:13px;margin:10px 0;cursor:pointer;font-weight:normal}
-.option input{display:inline-block;width:auto;margin:0 10px 0 0}
-.notice{padding:12px;border-radius:8px;background:#fff7ed;color:#9a3412;line-height:1.5}
-.muted{color:#64748b;font-size:14px}
-.item{padding:12px;border:1px solid #e2e8f0;border-radius:8px;margin:9px 0}
-footer{text-align:center;padding:20px;color:#64748b}
-@media(max-width:520px){.card{padding:15px}button{padding:11px 12px}}
+textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.info{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-weight:bold}#timer{color:var(--red);font-size:20px}
+.question{font-size:19px;font-weight:bold;margin:20px 0}.option{display:block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:7px;padding:13px;margin:10px 0;cursor:pointer;font-weight:normal}
+.option input{display:inline-block;width:auto;margin:0 10px 0 0}.notice{padding:12px;border-radius:8px;background:#fff7ed;color:#9a3412;line-height:1.5}
+.muted{color:#64748b;font-size:14px}.item{padding:12px;border:1px solid #e2e8f0;border-radius:8px;margin:9px 0}
+.status{padding:10px;border-radius:7px;background:#eff6ff;margin:10px 0;white-space:pre-wrap}.error{background:#fef2f2;color:#991b1b}
+footer{text-align:center;padding:20px;color:#64748b}@media(max-width:520px){.card{padding:15px}button{padding:11px 12px}}
 </style>
 </head>
 <body>
-<header>
-  <h1>CHELENQO SECONDARY SCHOOL</h1>
-  <p>Digital Examination System</p>
-  <p>Grades 9–12 | Student Examinations and Teacher Dashboard</p>
-</header>
-
-<nav>
-  <button type="button" id="studentTab">Student Examination</button>
-  <button type="button" id="teacherTab" class="secondary">Teacher / Admin Dashboard</button>
-  <button type="button" id="resultsTab" class="secondary">Saved Results</button>
-</nav>
-
+<header><h1>CHELENQO SECONDARY SCHOOL</h1><p>Digital Examination System</p><p>Grades 9–12 | Student Examinations and Teacher Dashboard</p></header>
+<nav><button id="homeTab">Home</button><button id="dashboardTab" class="secondary hidden">Dashboard</button><button id="resultsTab" class="secondary hidden">My Results</button><button id="logoutBtn" class="danger hidden">Sign out</button></nav>
 <main class="container">
-  <section id="studentPanel" class="card">
-    <h2>Student Registration</h2>
-    <p>Enter your details and select the examination assigned to your grade.</p>
-    <form id="studentForm">
-      <div class="grid">
-        <div><label for="studentName">Full name</label><input id="studentName" required autocomplete="name"></div>
-        <div><label for="studentId">Student ID</label><input id="studentId" required></div>
-        <div><label for="grade">Grade</label>
-          <select id="grade" required>
-            <option value="">Select grade</option><option value="9">Grade 9</option>
-            <option value="10">Grade 10</option><option value="11">Grade 11</option>
-            <option value="12">Grade 12</option>
-          </select>
-        </div>
-        <div><label for="section">Section</label><input id="section" placeholder="e.g. A" required></div>
-        <div><label for="subject">Subject</label><select id="subject" required disabled><option value="">First select grade</option></select></div>
-        <div><label for="examSelect">Available examination</label><select id="examSelect" required disabled><option value="">Select grade and subject first</option></select></div>
-        <div><label for="schoolCode">School examination code</label><input id="schoolCode" required autocomplete="off"></div>
-      </div>
-      <button type="submit" class="primary">Start Examination</button>
-      <p id="registrationMessage" role="alert"></p>
-    </form>
-  </section>
-
-  <section id="examPanel" class="card hidden">
-    <div class="info"><span id="studentDisplay"></span><span id="timer">00:00</span></div>
-    <hr>
-    <div class="info"><span id="questionNumber"></span><span id="answeredCount"></span></div>
-    <p id="questionText" class="question"></p>
-    <div id="options"></div>
-    <hr>
-    <button type="button" id="previousBtn" class="secondary">Previous</button>
-    <button type="button" id="nextBtn">Next</button>
-    <button type="button" id="submitBtn" class="danger">Submit Examination</button>
-  </section>
-
-  <section id="resultPanel" class="card hidden">
-    <h2>Examination Result</h2>
-    <p id="resultStudent"></p><p id="resultExam"></p>
-    <h3 id="score"></h3><h3 id="percentage"></h3>
-    <p id="resultMessage"></p>
-    <button type="button" id="returnHome" class="primary">Return to Home</button>
-  </section>
-
-  <section id="teacherPanel" class="card hidden">
-    <h2>Teacher / Administrator Dashboard</h2>
-    <p class="notice"><strong>Prototype notice:</strong> This first version saves exams and results only in this browser. It has no secure teacher login or shared database. Do not use it for real confidential examinations until Supabase authentication and database security are connected.</p>
-    <h3>Create an examination</h3>
-    <form id="examForm">
-      <div class="grid">
-        <div><label for="examGrade">Grade</label>
-          <select id="examGrade" required><option value="">Select grade</option><option value="9">Grade 9</option><option value="10">Grade 10</option><option value="11">Grade 11</option><option value="12">Grade 12</option></select>
-        </div>
-        <div><label for="examSubject">Subject</label><select id="examSubject" required disabled><option value="">First select grade</option></select></div>
-        <div><label for="examTitle">Examination title</label><input id="examTitle" placeholder="e.g. Unit 1 Assessment" required></div>
-        <div><label for="examDuration">Duration (minutes)</label><input id="examDuration" type="number" min="1" max="240" value="60" required></div>
-      </div>
-      <label for="questionsJson">Questions (JSON format)</label>
-      <textarea id="questionsJson" required spellcheck="false">[
-  {
-    "question": "Why do atoms share electrons in covalent bonds?",
-    "options": [
-      "To achieve a more stable electron configuration",
-      "To increase their atomic mass",
-      "To become positively charged",
-      "To lose all their electrons"
-    ],
-    "answer": 0
-  },
-  {
-    "question": "Which of the following is a strong acid?",
-    "options": ["CH3COOH", "HCl", "H2CO3", "HF"],
-    "answer": 1
-  }
+<section id="authPanel" class="card">
+<h2>Sign in</h2><p>Students and authorized staff sign in using their registered email and password.</p>
+<form id="loginForm"><label>Email</label><input id="loginEmail" type="email" autocomplete="username" required><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" required><button class="primary" type="submit">Sign in</button></form>
+<hr><h3>New student registration</h3>
+<p class="muted">Use a valid email address. If email confirmation is enabled, confirm the email before signing in.</p>
+<form id="registerForm"><div class="grid">
+<div><label>Full name</label><input id="regName" required autocomplete="name"></div>
+<div><label>Email</label><input id="regEmail" type="email" required autocomplete="email"></div>
+<div><label>Password (at least 6 characters)</label><input id="regPassword" type="password" minlength="6" required autocomplete="new-password"></div>
+<div><label>Grade</label><select id="regGrade" required><option value="">Select grade</option><option>9</option><option>10</option><option>11</option><option>12</option></select></div>
+<div><label>Section</label><input id="regSection" required placeholder="e.g. A"></div>
+</div><button type="submit" class="primary">Register student</button></form>
+<div id="authMessage" class="status" role="status"></div>
+</section>
+<section id="studentPanel" class="card hidden"><div class="info"><h2>Student examination</h2><span id="studentWelcome"></span></div>
+<label>Available examination</label><select id="availableExam"><option value="">Loading examinations...</option></select>
+<button id="startExamBtn" class="primary" disabled>Start examination</button><div id="studentMessage" class="status"></div>
+</section>
+<section id="examPanel" class="card hidden"><div class="info"><span id="examHeading"></span><span id="timer">00:00</span></div><hr>
+<div class="info"><span id="questionNumber"></span><span id="answeredCount"></span></div><p id="questionText" class="question"></p><div id="options"></div>
+<hr><button id="previousBtn" class="secondary">Previous</button><button id="nextBtn">Next</button><button id="submitBtn" class="danger">Submit examination</button><div id="examMessage" class="status"></div></section>
+<section id="resultPanel" class="card hidden"><h2>Examination submitted</h2><h3 id="scoreLine"></h3><p id="resultLine"></p><button id="backToDashboard" class="primary">Back to dashboard</button></section>
+<section id="teacherPanel" class="card hidden"><h2>Teacher / Administrator Dashboard</h2>
+<p class="notice">Teacher actions are protected by Supabase authentication, database permissions and the create/publish database functions. Never put a Supabase service-role key in this file.</p>
+<h3>Create examination</h3><form id="examForm"><div class="grid">
+<div><label>Grade</label><select id="examGrade" required><option value="">Select grade</option><option value="9">Grade 9</option><option value="10">Grade 10</option><option value="11">Grade 11</option><option value="12">Grade 12</option></select></div>
+<div><label>Subject</label><select id="examSubject" required disabled><option value="">Select grade first</option></select></div>
+<div><label>Examination title</label><input id="examTitle" required placeholder="e.g. Unit 1 Assessment"></div>
+<div><label>Duration (minutes)</label><input id="examDuration" type="number" min="1" max="240" value="60" required></div>
+</div><label>Questions (JSON)</label><textarea id="questionsJson" required spellcheck="false">[
+  {"question_text":"What is the pH of a neutral solution at 25°C?","options":["1","5","7","14"],"correct_option":2,"marks":1,"explanation":"A neutral solution has pH 7 at 25°C."}
 ]</textarea>
-      <p class="muted">Each question needs a question, an options array, and an answer index. The first option is index 0, the second is 1, the third is 2, and the fourth is 3.</p>
-      <button type="submit" class="primary">Save Examination</button>
-      <p id="teacherMessage" role="status"></p>
-    </form>
-    <hr>
-    <h3>Published examinations on this device</h3>
-    <div id="examList"></div>
-  </section>
-
-  <section id="resultsPanel" class="card hidden">
-    <h2>Saved Examination Results</h2>
-    <p class="notice">These results are stored in this browser only in this prototype.</p>
-    <div id="resultsList"></div>
-  </section>
-</main>
-
-<footer>&copy; 2026 Chelenqo Secondary School</footer>
-
+<p class="muted">Each question requires question_text, options (array), correct_option (zero-based option index), and marks. explanation is optional. Answer keys are sent only to the protected database function; they are not displayed to students.</p>
+<button type="submit" class="primary">Create examination</button></form><div id="teacherMessage" class="status"></div>
+<hr><h3>Examinations</h3><div id="teacherExamList"></div></section>
+<section id="resultsPanel" class="card hidden"><h2>My examination results</h2><div id="myResults"></div></section>
+</main><footer>© 2026 Chelenqo Secondary School</footer>
 <script>
 "use strict";
-
-const subjectsByGrade = {
-  "9": ["Mathematics","English","Physics","Chemistry","Biology","Geography","History","Civics","ICT","Afaan Oromo","Amharic"],
-  "10": ["Mathematics","English","Physics","Chemistry","Biology","Geography","History","Civics","ICT","Afaan Oromo","Amharic"],
-  "11": ["Mathematics","English","Physics","Chemistry","Biology","Geography","History","Economics","ICT","Afaan Oromo","Amharic"],
-  "12": ["Mathematics","English","Physics","Chemistry","Biology","Geography","History","Economics","ICT","Afaan Oromo","Amharic"]
-};
-
-const STORAGE_EXAMS = "chelenqo_exams_v1";
-const STORAGE_RESULTS = "chelenqo_results_v1";
-
-const sampleExam = {
-  id: "sample-grade12-chemistry",
-  grade: "12",
-  subject: "Chemistry",
-  title: "Grade 12 Chemistry Sample Examination",
-  duration: 60,
-  questions: [
-    {question:"Why do atoms share electrons in covalent bonds?",options:["To achieve a more stable electron configuration","To increase their atomic mass","To become positively charged","To lose all their electrons"],answer:0},
-    {question:"Which of the following is a strong acid?",options:["CH3COOH","HCl","H2CO3","HF"],answer:1},
-    {question:"What is the pH of a neutral solution at 25°C?",options:["1","5","7","14"],answer:2},
-    {question:"Which ion makes an aqueous NaF solution basic?",options:["Na+","F-","H+","Cl-"],answer:1},
-    {question:"Which theory explains molecular shape?",options:["Kinetic molecular theory","VSEPR theory","Collision theory","Atomic theory"],answer:1}
-  ]
-};
-
-function loadArray(key, fallback) {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(key));
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch (error) {
-    return fallback;
-  }
-}
-let exams = loadArray(STORAGE_EXAMS, [sampleExam]);
-let results = loadArray(STORAGE_RESULTS, []);
-if (!exams.some(exam => exam.id === sampleExam.id)) exams.unshift(sampleExam);
-
-let student = null;
-let activeExam = null;
-let currentQuestion = 0;
-let answers = [];
-let secondsLeft = 0;
-let timerHandle = null;
-let submitted = false;
-
+const SUPABASE_URL = "https://yqwbdpsbtugunmtbvito.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
+const db = window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 const $ = id => document.getElementById(id);
-const panels = ["studentPanel","examPanel","resultPanel","teacherPanel","resultsPanel"];
-
-function showPanel(panelId) {
-  panels.forEach(id => $(id).classList.toggle("hidden", id !== panelId));
-  $("studentTab").classList.toggle("secondary", panelId !== "studentPanel");
-  $("teacherTab").classList.toggle("secondary", panelId !== "teacherPanel");
-  $("resultsTab").classList.toggle("secondary", panelId !== "resultsPanel");
+const panels = ["authPanel","studentPanel","examPanel","resultPanel","teacherPanel","resultsPanel"];
+let currentUser=null, profile=null, subjects=[], exams=[], activeExam=null, questions=[], answers={}, questionIndex=0, attemptId=null, secondsLeft=0, timer=null, submitting=false;
+function message(id,text,isError=false){$(id).textContent=text;$(id).classList.toggle("error",isError)}
+function showPanel(id){panels.forEach(p=>$(p).classList.toggle("hidden",p!==id));}
+function setNav(signedIn,staff){$("dashboardTab").classList.toggle("hidden",!signedIn);$("resultsTab").classList.toggle("hidden",!signedIn||staff);$("logoutBtn").classList.toggle("hidden",!signedIn);}
+function failText(error){return error&&error.message?error.message:String(error);}
+async function loadProfile(){
+ const {data,error}=await db.from("profiles").select("id,full_name,grade_level,section,role").eq("id",currentUser.id).single();
+ if(error)throw error;profile=data;
+ const staff=["admin","teacher","staff"].includes(String(profile.role||"").toLowerCase());
+ setNav(true,staff);$("dashboardTab").textContent=staff?"Teacher dashboard":"Student dashboard";
+ $("studentWelcome").textContent=profile.full_name||currentUser.email;
+ if(staff){await loadTeacherDashboard();showPanel("teacherPanel");}
+ else{await loadStudentExams();showPanel("studentPanel");}
 }
-function saveExams() {
-  localStorage.setItem(STORAGE_EXAMS, JSON.stringify(exams));
+async function refreshSession(){
+ const {data,error}=await db.auth.getSession();if(error)throw error;
+ if(data.session){currentUser=data.session.user;await loadProfile();}
+ else{currentUser=null;profile=null;setNav(false,false);showPanel("authPanel");}
 }
-function saveResults() {
-  localStorage.setItem(STORAGE_RESULTS, JSON.stringify(results));
-}
-function fillSubjects(gradeId, subjectId) {
-  const grade = $(gradeId).value;
-  const select = $(subjectId);
-  select.innerHTML = '<option value="">Select subject</option>';
-  (subjectsByGrade[grade] || []).forEach(subject => {
-    const option = document.createElement("option");
-    option.value = subject;
-    option.textContent = subject;
-    select.appendChild(option);
-  });
-  select.disabled = !grade;
-}
-function fillAvailableExams() {
-  const grade = $("grade").value;
-  const subject = $("subject").value;
-  const select = $("examSelect");
-  select.innerHTML = '<option value="">Select examination</option>';
-  exams.filter(e => e.grade === grade && e.subject === subject).forEach(exam => {
-    const option = document.createElement("option");
-    option.value = exam.id;
-    option.textContent = exam.title;
-    select.appendChild(option);
-  });
-  select.disabled = !grade || !subject || select.options.length === 1;
-  if (select.disabled) select.innerHTML = '<option value="">No examination available</option>';
-}
-
-$("grade").addEventListener("change", () => {
-  fillSubjects("grade","subject");
-  $("examSelect").innerHTML = '<option value="">Select subject first</option>';
-  $("examSelect").disabled = true;
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();message("authMessage","Signing in...");
+ const {data,error}=await db.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value});
+ if(error){message("authMessage",failText(error),true);return;}
+ currentUser=data.user;try{await loadProfile();message("authMessage","Signed in successfully.");}catch(err){message("authMessage","Signed in, but profile/dashboard could not load: "+failText(err),true);}
 });
-$("subject").addEventListener("change", fillAvailableExams);
-$("examGrade").addEventListener("change", () => fillSubjects("examGrade","examSubject"));
-
-$("studentForm").addEventListener("submit", event => {
-  event.preventDefault();
-  const exam = exams.find(e => e.id === $("examSelect").value);
-  if (!exam) {
-    $("registrationMessage").textContent = "No examination is available for this grade and subject.";
-    return;
-  }
-  student = {
-    name: $("studentName").value.trim(),
-    id: $("studentId").value.trim(),
-    grade: $("grade").value,
-    section: $("section").value.trim(),
-    subject: $("subject").value,
-    schoolCode: $("schoolCode").value.trim()
-  };
-  if (Object.values(student).some(value => !value)) {
-    $("registrationMessage").textContent = "Please complete all registration fields.";
-    return;
-  }
-  activeExam = exam;
-  currentQuestion = 0;
-  answers = new Array(activeExam.questions.length).fill(null);
-  secondsLeft = Number(activeExam.duration) * 60;
-  submitted = false;
-  $("studentDisplay").textContent = `${student.name} | Grade ${student.grade} | ${student.subject}`;
-  showPanel("examPanel");
-  renderQuestion();
-  updateTimer();
-  clearInterval(timerHandle);
-  timerHandle = setInterval(() => {
-    secondsLeft--;
-    updateTimer();
-    if (secondsLeft <= 0) finishExam(true);
-  }, 1000);
+$("registerForm").addEventListener("submit",async e=>{e.preventDefault();message("authMessage","Registering student...");
+ const {data,error}=await db.auth.signUp({email:$("regEmail").value.trim(),password:$("regPassword").value,options:{data:{full_name:$("regName").value.trim(),grade_level:Number($("regGrade").value),section:$("regSection").value.trim(),role:"student"}}});
+ if(error){message("authMessage",failText(error),true);return;}
+ if(data.session){currentUser=data.user;try{await loadProfile();}catch(err){message("authMessage","Account created, but profile setup needs attention: "+failText(err),true);}}
+ else message("authMessage","Registration received. Check the registered email for a confirmation link, then sign in.");
 });
-
-function updateTimer() {
-  const mins = Math.floor(secondsLeft / 60);
-  const secs = secondsLeft % 60;
-  $("timer").textContent = `${String(mins).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
+$("logoutBtn").addEventListener("click",async()=>{clearInterval(timer);await db.auth.signOut();currentUser=null;profile=null;setNav(false,false);showPanel("authPanel");message("authMessage","You have signed out.");});
+$("homeTab").addEventListener("click",()=>{if(!currentUser)showPanel("authPanel");else if(["admin","teacher","staff"].includes(String(profile.role||"").toLowerCase()))showPanel("teacherPanel");else showPanel("studentPanel");});
+$("dashboardTab").addEventListener("click",async()=>{try{if(["admin","teacher","staff"].includes(String(profile.role||"").toLowerCase())){await loadTeacherDashboard();showPanel("teacherPanel");}else{await loadStudentExams();showPanel("studentPanel");}}catch(e){alert(failText(e));}});
+$("resultsTab").addEventListener("click",async()=>{await loadMyResults();showPanel("resultsPanel");});
+async function loadStudentExams(){
+ const {data:subData,error:subErr}=await db.from("subjects").select("id,subject_name,grade_level");if(subErr)throw subErr;subjects=subData||[];
+ const {data,error}=await db.from("exams").select("id,title,subject_id,grade_level,duration_minutes,total_marks,is_published").eq("is_published",true).eq("grade_level",Number(profile.grade_level)).order("created_at",{ascending:false});
+ if(error)throw error;exams=data||[];const select=$("availableExam");select.innerHTML='<option value="">Choose an examination</option>';
+ exams.forEach(ex=>{const op=document.createElement("option");op.value=ex.id;const sub=subjects.find(s=>s.id===ex.subject_id);op.textContent=(sub?sub.subject_name:"Subject")+" — "+ex.title+" ("+ex.duration_minutes+" min)";select.appendChild(op);});
+ $("startExamBtn").disabled=!exams.length;message("studentMessage",exams.length?"Select an examination and press Start.":"No published examinations are available for your grade yet.");
 }
-function renderQuestion() {
-  const q = activeExam.questions[currentQuestion];
-  $("questionNumber").textContent = `Question ${currentQuestion + 1} of ${activeExam.questions.length}`;
-  $("answeredCount").textContent = `Answered: ${answers.filter(a => a !== null).length}`;
-  $("questionText").textContent = q.question;
-  const optionsBox = $("options");
-  optionsBox.innerHTML = "";
-  q.options.forEach((optionText,index) => {
-    const label = document.createElement("label");
-    label.className = "option";
-    const radio = document.createElement("input");
-    radio.type = "radio";
-    radio.name = "answer";
-    radio.value = String(index);
-    radio.checked = answers[currentQuestion] === index;
-    radio.addEventListener("change", () => {
-      answers[currentQuestion] = index;
-      renderQuestion();
-    });
-    label.appendChild(radio);
-    label.appendChild(document.createTextNode(`${String.fromCharCode(65 + index)}. ${optionText}`));
-    optionsBox.appendChild(label);
-  });
-  $("previousBtn").disabled = currentQuestion === 0;
-  $("nextBtn").disabled = currentQuestion === activeExam.questions.length - 1;
+$("availableExam").addEventListener("change",()=>{$("startExamBtn").disabled=!$("availableExam").value;});
+$("startExamBtn").addEventListener("click",async()=>{
+ const exam=exams.find(x=>x.id===$("availableExam").value);if(!exam)return;
+ message("studentMessage","Preparing your examination...");
+ try{
+  const {data:attempt,error:attemptError}=await db.from("exam_attempts").insert({exam_id:exam.id,student_id:currentUser.id,score:null,submitted_at:null,status:"in_progress"}).select("id").single();
+  if(attemptError)throw attemptError;
+  const {data:qData,error:qError}=await db.from("exam_questions").select("id,question_text,options,marks,question_order").eq("exam_id",exam.id).order("question_order",{ascending:true});
+  if(qError)throw qError;if(!qData||!qData.length)throw new Error("This examination has no questions.");
+  activeExam=exam;attemptId=attempt.id;questions=qData;answers={};questionIndex=0;submitting=false;secondsLeft=Number(exam.duration_minutes)*60;
+  $("examHeading").textContent=exam.title;showPanel("examPanel");renderQuestion();updateTimer();clearInterval(timer);
+  timer=setInterval(()=>{secondsLeft--;updateTimer();if(secondsLeft<=0)submitExam(true);},1000);
+ }catch(err){message("studentMessage","Could not start examination: "+failText(err),true);}
+});
+function updateTimer(){const m=Math.floor(secondsLeft/60),s=secondsLeft%60;$("timer").textContent=String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");}
+function renderQuestion(){
+ const q=questions[questionIndex];$("questionNumber").textContent="Question "+(questionIndex+1)+" of "+questions.length;
+ $("answeredCount").textContent="Answered: "+Object.keys(answers).length;$("questionText").textContent=q.question_text;
+ const box=$("options");box.replaceChildren();
+ (Array.isArray(q.options)?q.options:[]).forEach((opt,i)=>{const label=document.createElement("label");label.className="option";const radio=document.createElement("input");radio.type="radio";radio.name="answer";radio.value=String(i);radio.checked=String(answers[q.id])===String(i);radio.addEventListener("change",()=>{answers[q.id]=String(i);renderQuestion();});label.append(radio,document.createTextNode(String.fromCharCode(65+i)+". "+opt));box.appendChild(label);});
+ $("previousBtn").disabled=questionIndex===0;$("nextBtn").disabled=questionIndex===questions.length-1;
 }
-$("previousBtn").addEventListener("click", () => {
-  if (currentQuestion > 0) { currentQuestion--; renderQuestion(); }
-});
-$("nextBtn").addEventListener("click", () => {
-  if (currentQuestion < activeExam.questions.length - 1) { currentQuestion++; renderQuestion(); }
-});
-$("submitBtn").addEventListener("click", () => {
-  const unanswered = answers.filter(a => a === null).length;
-  if (unanswered && !confirm(`${unanswered} question(s) are unanswered. Submit anyway?`)) return;
-  finishExam(false);
-});
-
-function finishExam(timeExpired) {
-  if (submitted || !activeExam || !student) return;
-  submitted = true;
-  clearInterval(timerHandle);
-  const marks = activeExam.questions.reduce((total,q,index) => total + (answers[index] === Number(q.answer) ? 1 : 0),0);
-  const total = activeExam.questions.length;
-  const percent = total ? marks / total * 100 : 0;
-  const result = {
-    studentName: student.name,
-    studentId: student.id,
-    grade: student.grade,
-    section: student.section,
-    subject: student.subject,
-    examTitle: activeExam.title,
-    marks, total,
-    percentage: Number(percent.toFixed(1)),
-    submittedAt: new Date().toLocaleString()
-  };
-  results.unshift(result);
-  try { saveResults(); } catch (error) { alert("Could not save result in this browser. Storage may be full."); }
-  $("resultStudent").textContent = `Student: ${student.name} | ID: ${student.id} | Grade ${student.grade} ${student.section}`;
-  $("resultExam").textContent = `${activeExam.subject} — ${activeExam.title}`;
-  $("score").textContent = `Score: ${marks} / ${total}`;
-  $("percentage").textContent = `Percentage: ${percent.toFixed(1)}%`;
-  $("resultMessage").textContent = timeExpired ? "Time expired. Your answers were submitted automatically." : "Examination submitted successfully.";
+$("previousBtn").addEventListener("click",()=>{if(questionIndex>0){questionIndex--;renderQuestion();}});
+$("nextBtn").addEventListener("click",()=>{if(questionIndex<questions.length-1){questionIndex++;renderQuestion();}});
+$("submitBtn").addEventListener("click",()=>{const left=questions.length-Object.keys(answers).length;if(left&&!confirm(left+" question(s) are unanswered. Submit anyway?"))return;submitExam(false);});
+async function submitExam(expired){
+ if(submitting||!attemptId)return;submitting=true;clearInterval(timer);$("submitBtn").disabled=true;message("examMessage","Submitting answers securely for automatic marking...");
+ try{
+  const {data:score,error}=await db.rpc("submit_exam_answers",{p_attempt_id:attemptId,p_answers:answers});
+  if(error)throw error;
+  const total=questions.reduce((sum,q)=>sum+Number(q.marks||0),0);const percent=total?Number(score)/total*100:0;
+  $("scoreLine").textContent="Score: "+Number(score)+" / "+total+" ("+percent.toFixed(1)+"%)";
+  $("resultLine").textContent=expired?"Time expired. Your answers were submitted automatically.":"Your answers were submitted and marked by the server.";
   showPanel("resultPanel");
+ }catch(err){submitting=false;$("submitBtn").disabled=false;message("examMessage","Submission failed: "+failText(err)+". Your attempt has not been confirmed as submitted. Please contact the examination administrator.",true);}
 }
-$("returnHome").addEventListener("click", () => {
-  $("studentForm").reset();
-  $("subject").innerHTML = '<option value="">First select grade</option>';
-  $("subject").disabled = true;
-  $("examSelect").innerHTML = '<option value="">Select grade and subject first</option>';
-  $("examSelect").disabled = true;
-  $("registrationMessage").textContent = "";
-  showPanel("studentPanel");
+$("backToDashboard").addEventListener("click",async()=>{attemptId=null;activeExam=null;await loadStudentExams();showPanel("studentPanel");});
+async function loadTeacherDashboard(){
+ const {data:sData,error:sErr}=await db.from("subjects").select("id,subject_name,grade_level").order("grade_level").order("subject_name");if(sErr)throw sErr;subjects=sData||[];
+ populateSubjectSelect();await renderTeacherExams();
+}
+function populateSubjectSelect(){const grade=$("examGrade").value,sel=$("examSubject");sel.innerHTML='<option value="">Select subject</option>';
+ subjects.filter(s=>String(s.grade_level)===String(grade)).forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=s.subject_name;sel.appendChild(o);});sel.disabled=!grade;}
+$("examGrade").addEventListener("change",populateSubjectSelect);
+$("examForm").addEventListener("submit",async e=>{e.preventDefault();message("teacherMessage","Creating examination...");
+ try{
+  const parsed=JSON.parse($("questionsJson").value);if(!Array.isArray(parsed)||!parsed.length)throw new Error("Enter at least one question.");
+  const valid=parsed.every(q=>q&&typeof q.question_text==="string"&&q.question_text.trim()&&Array.isArray(q.options)&&q.options.length>=2&&Number.isInteger(Number(q.correct_option))&&Number(q.correct_option)>=0&&Number(q.correct_option)<q.options.length&&Number(q.marks)>0);
+  if(!valid)throw new Error("Check each question: question_text, options, valid zero-based correct_option, and positive marks are required.");
+  const payload=parsed.map(q=>({question_text:q.question_text.trim(),options:q.options,correct_option:String(q.correct_option),marks:Number(q.marks),explanation:q.explanation||""}));
+  const {data:examId,error}=await db.rpc("create_teacher_exam",{p_title:$("examTitle").value.trim(),p_grade_level:Number($("examGrade").value),p_subject_id:$("examSubject").value,p_duration_minutes:Number($("examDuration").value),p_questions:payload});
+  if(error)throw error;message("teacherMessage","Examination created as a draft. Publish it below when it is ready.");$("examForm").reset();$("examDuration").value="60";populateSubjectSelect();await renderTeacherExams();
+ }catch(err){message("teacherMessage",failText(err),true);}
 });
-
-$("examForm").addEventListener("submit", event => {
-  event.preventDefault();
-  const grade = $("examGrade").value;
-  const subject = $("examSubject").value;
-  const title = $("examTitle").value.trim();
-  const duration = Number($("examDuration").value);
-  let questions;
-  try {
-    questions = JSON.parse($("questionsJson").value);
-  } catch (error) {
-    $("teacherMessage").textContent = "Invalid JSON. Check commas, quotation marks and brackets.";
-    return;
-  }
-  if (!grade || !subject || !title || !Number.isInteger(duration) || duration < 1 || duration > 240) {
-    $("teacherMessage").textContent = "Complete all fields. Duration must be 1–240 minutes.";
-    return;
-  }
-  if (!Array.isArray(questions) || questions.length < 1) {
-    $("teacherMessage").textContent = "Add at least one question.";
-    return;
-  }
-  const valid = questions.every(q =>
-    q && typeof q.question === "string" && q.question.trim() &&
-    Array.isArray(q.options) && q.options.length >= 2 &&
-    q.options.every(option => typeof option === "string" && option.trim()) &&
-    Number.isInteger(q.answer) && q.answer >= 0 && q.answer < q.options.length
-  );
-  if (!valid) {
-    $("teacherMessage").textContent = "Question format is incorrect. Each answer must be a valid zero-based option index.";
-    return;
-  }
-  exams.unshift({id:`exam-${Date.now()}`,grade,subject,title,duration,questions});
-  try {
-    saveExams();
-    $("teacherMessage").textContent = "Examination saved on this device.";
-    $("examForm").reset();
-    $("examDuration").value = "60";
-    $("examSubject").innerHTML = '<option value="">First select grade</option>';
-    $("examSubject").disabled = true;
-    renderExamList();
-  } catch (error) {
-    $("teacherMessage").textContent = "Could not save. Browser storage may be full.";
-  }
-});
-function renderExamList() {
-  const box = $("examList");
-  box.innerHTML = "";
-  if (!exams.length) { box.textContent = "No examinations created yet."; return; }
-  exams.forEach(exam => {
-    const item = document.createElement("div");
-    item.className = "item";
-    const title = document.createElement("strong");
-    title.textContent = `Grade ${exam.grade} — ${exam.subject}: ${exam.title}`;
-    const details = document.createElement("p");
-    details.className = "muted";
-    details.textContent = `${exam.questions.length} questions | ${exam.duration} minutes`;
-    item.append(title,details);
-    if (exam.id !== sampleExam.id) {
-      const del = document.createElement("button");
-      del.type = "button";
-      del.className = "danger";
-      del.textContent = "Delete";
-      del.addEventListener("click", () => {
-        if (confirm(`Delete "${exam.title}"?`)) {
-          exams = exams.filter(e => e.id !== exam.id);
-          saveExams();
-          renderExamList();
-        }
-      });
-      item.appendChild(del);
-    }
-    box.appendChild(item);
-  });
+async function renderTeacherExams(){
+ const {data,error}=await db.from("exams").select("id,title,subject_id,grade_level,duration_minutes,total_marks,is_published,created_at").order("created_at",{ascending:false});if(error)throw error;
+ const box=$("teacherExamList");box.replaceChildren();if(!data||!data.length){box.textContent="No examinations found.";return;}
+ data.forEach(ex=>{const item=document.createElement("div");item.className="item";const sub=subjects.find(s=>s.id===ex.subject_id);const title=document.createElement("strong");title.textContent="Grade "+ex.grade_level+" — "+(sub?sub.subject_name:"Subject")+": "+ex.title;
+ const detail=document.createElement("p");detail.className="muted";detail.textContent=ex.total_marks+" marks | "+ex.duration_minutes+" minutes | "+(ex.is_published?"Published":"Draft");item.append(title,detail);
+ const btn=document.createElement("button");btn.type="button";btn.textContent=ex.is_published?"Unpublish":"Publish";btn.className=ex.is_published?"secondary":"primary";btn.addEventListener("click",async()=>{btn.disabled=true;try{const {data:ok,error}=await db.rpc("publish_teacher_exam",{p_exam_id:ex.id,p_publish:!ex.is_published});if(error)throw error;if(ok===false)throw new Error("Database did not approve this change.");await renderTeacherExams();message("teacherMessage",ex.is_published?"Examination unpublished.":"Examination published.");}catch(err){message("teacherMessage",failText(err),true);btn.disabled=false;}});item.appendChild(btn);box.appendChild(item);});
 }
-function renderResults() {
-  const box = $("resultsList");
-  box.innerHTML = "";
-  if (!results.length) { box.textContent = "No saved results on this device yet."; return; }
-  results.forEach(r => {
-    const item = document.createElement("div");
-    item.className = "item";
-    const heading = document.createElement("strong");
-    heading.textContent = `${r.studentName} (${r.studentId}) — Grade ${r.grade} ${r.section}`;
-    const detail = document.createElement("p");
-    detail.textContent = `${r.subject} | ${r.examTitle} | ${r.marks}/${r.total} (${r.percentage}%)`;
-    const date = document.createElement("p");
-    date.className = "muted";
-    date.textContent = r.submittedAt;
-    item.append(heading,detail,date);
-    box.appendChild(item);
-  });
+async function loadMyResults(){
+ const {data,error}=await db.from("exam_attempts").select("id,exam_id,score,status,submitted_at").eq("student_id",currentUser.id).order("started_at",{ascending:false});if(error)throw error;
+ const examIds=[...new Set((data||[]).map(a=>a.exam_id))];let titles={};
+ if(examIds.length){const {data:es,error:ee}=await db.from("exams").select("id,title").in("id",examIds);if(ee)throw ee;(es||[]).forEach(e=>titles[e.id]=e.title);}
+ const box=$("myResults");box.replaceChildren();if(!data||!data.length){box.textContent="No examination attempts found.";return;}
+ data.forEach(a=>{const item=document.createElement("div");item.className="item";const h=document.createElement("strong");h.textContent=titles[a.exam_id]||"Examination";const p=document.createElement("p");p.textContent="Status: "+a.status+" | Score: "+(a.score===null?"Not marked":a.score)+" | Submitted: "+(a.submitted_at||"Not submitted");item.append(h,p);box.appendChild(item);});
 }
-$("studentTab").addEventListener("click", () => showPanel("studentPanel"));
-$("teacherTab").addEventListener("click", () => { renderExamList(); showPanel("teacherPanel"); });
-$("resultsTab").addEventListener("click", () => { renderResults(); showPanel("resultsPanel"); });
-
-renderExamList();
-</script>
-</body>
-</html>
+db.auth.onAuthStateChange((_event,session)=>{if(!session){currentUser=null;profile=null;setNav(false,false);showPanel("authPanel");}});
+refreshSession().catch(err=>{setNav(false,false);showPanel("authPanel");message("authMessage","Could not restore session: "+failText(err),true);});
+</script></body></html>
