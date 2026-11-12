@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#123c69">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <title>Chelenqo Digital Examination System</title>
 <style>
 :root{--navy:#123c69;--blue:#1769aa;--green:#15803d;--red:#b91c1c;--bg:#f1f5f9;--ink:#172554}
@@ -46,11 +47,24 @@ footer{text-align:center;padding:20px;color:#64748b}
 
 <nav>
   <button type="button" id="studentTab">Student Examination</button>
-  <button type="button" id="teacherTab" class="secondary">Teacher / Admin Dashboard</button>
-  <button type="button" id="resultsTab" class="secondary">Saved Results</button>
+  <button type="button" id="adminLoginTab" class="secondary">Administrator Sign-in</button>
+  <button type="button" id="teacherTab" class="secondary hidden">Teacher / Admin Dashboard</button>
+  <button type="button" id="resultsTab" class="secondary hidden">Saved Results</button>
+  <button type="button" id="logoutBtn" class="danger hidden">Sign out</button>
 </nav>
 
 <main class="container">
+  <section id="loginPanel" class="card hidden">
+    <h2>Administrator Sign-in</h2>
+    <p>Sign in with the administrator account created in Supabase Authentication.</p>
+    <form id="loginForm">
+      <label for="loginEmail">Email address</label><input id="loginEmail" type="email" autocomplete="username" required>
+      <label for="loginPassword">Password</label><input id="loginPassword" type="password" autocomplete="current-password" required>
+      <button type="submit" class="primary" id="loginSubmit">Sign in</button>
+      <p id="loginMessage" role="alert" aria-live="polite"></p>
+    </form>
+    <p class="muted">Never share your password. Sign-in is checked against the administrator role in the school profile.</p>
+  </section>
   <section id="studentPanel" class="card">
     <h2>Student Registration</h2>
     <p>Enter your details and select the examination assigned to your grade.</p>
@@ -97,7 +111,7 @@ footer{text-align:center;padding:20px;color:#64748b}
 
   <section id="teacherPanel" class="card hidden">
     <h2>Teacher / Administrator Dashboard</h2>
-    <p class="notice"><strong>Prototype notice:</strong> This first version saves exams and results only in this browser. It has no secure teacher login or shared database. Do not use it for real confidential examinations until Supabase authentication and database security are connected.</p>
+    <p class="notice"><strong>Storage notice:</strong> This upgrade checks Supabase sign-in and the administrator profile before showing this dashboard. Examination content and results in this version are still stored in this browser; do not use it for confidential live examinations until database storage and server-side access policies are completed and tested.</p>
     <h3>Create an examination</h3>
     <form id="examForm">
       <div class="grid">
@@ -154,6 +168,10 @@ const subjectsByGrade = {
   "12": ["Mathematics","English","Physics","Chemistry","Biology","Geography","History","Economics","ICT","Afaan Oromo","Amharic"]
 };
 
+const SUPABASE_URL = "https://yqwbdpsbtugunmtbvito.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+let authenticatedAdmin = false;
 const STORAGE_EXAMS = "chelenqo_exams_v1";
 const STORAGE_RESULTS = "chelenqo_results_v1";
 
@@ -193,9 +211,10 @@ let timerHandle = null;
 let submitted = false;
 
 const $ = id => document.getElementById(id);
-const panels = ["studentPanel","examPanel","resultPanel","teacherPanel","resultsPanel"];
+const panels = ["loginPanel","studentPanel","examPanel","resultPanel","teacherPanel","resultsPanel"];
 
 function showPanel(panelId) {
+  if ((panelId === "teacherPanel" || panelId === "resultsPanel") && !authenticatedAdmin) panelId = "loginPanel";
   panels.forEach(id => $(id).classList.toggle("hidden", id !== panelId));
   $("studentTab").classList.toggle("secondary", panelId !== "studentPanel");
   $("teacherTab").classList.toggle("secondary", panelId !== "teacherPanel");
@@ -450,11 +469,66 @@ function renderResults() {
     box.appendChild(item);
   });
 }
+async function refreshAdminSession() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) { setAdminUi(false); return; }
+  const { data: profile, error } = await supabaseClient.from("profiles").select("role").eq("id", session.user.id).maybeSingle();
+  if (error || !profile || profile.role !== "admin") {
+    await supabaseClient.auth.signOut();
+    setAdminUi(false);
+    $("loginMessage").textContent = "This account does not have an administrator profile. Ask the school system administrator to check its role.";
+    return;
+  }
+  setAdminUi(true);
+}
+function setAdminUi(isAdmin) {
+  authenticatedAdmin = isAdmin;
+  $("teacherTab").classList.toggle("hidden", !isAdmin);
+  $("resultsTab").classList.toggle("hidden", !isAdmin);
+  $("logoutBtn").classList.toggle("hidden", !isAdmin);
+  $("adminLoginTab").classList.toggle("hidden", isAdmin);
+  if (!isAdmin && (!$("teacherPanel").classList.contains("hidden") || !$("resultsPanel").classList.contains("hidden"))) showPanel("studentPanel");
+}
+$("adminLoginTab").addEventListener("click", () => showPanel("loginPanel"));
+$("loginForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const submit = $("loginSubmit");
+  submit.disabled = true;
+  $("loginMessage").textContent = "Checking sign-in…";
+  const { error } = await supabaseClient.auth.signInWithPassword({
+    email: $("loginEmail").value.trim(),
+    password: $("loginPassword").value
+  });
+  if (error) {
+    $("loginMessage").textContent = "Sign-in failed. Check the email and password, then try again.";
+    submit.disabled = false;
+    return;
+  }
+  await refreshAdminSession();
+  submit.disabled = false;
+  if (authenticatedAdmin) {
+    $("loginForm").reset();
+    $("loginMessage").textContent = "";
+    renderExamList();
+    showPanel("teacherPanel");
+  }
+});
+$("logoutBtn").addEventListener("click", async () => {
+  await supabaseClient.auth.signOut();
+  setAdminUi(false);
+  showPanel("studentPanel");
+});
+supabaseClient.auth.onAuthStateChange((_event, _session) => {
+  window.setTimeout(refreshAdminSession, 0);
+});
 $("studentTab").addEventListener("click", () => showPanel("studentPanel"));
 $("teacherTab").addEventListener("click", () => { renderExamList(); showPanel("teacherPanel"); });
 $("resultsTab").addEventListener("click", () => { renderResults(); showPanel("resultsPanel"); });
 
 renderExamList();
+setAdminUi(false);
+showPanel("studentPanel");
+refreshAdminSession();
 </script>
 </body>
 </html>
