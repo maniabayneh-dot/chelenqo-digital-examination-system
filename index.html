@@ -55,9 +55,24 @@ footer{text-align:center;padding:20px;color:#64748b}
 
 <main class="container">
   <section id="studentPanel" class="card">
-    <h2>Student Examination</h2>
-    <p class="notice"><strong>Examinations temporarily unavailable.</strong> This page is being connected to the secure school database. Do not enter student information or attempt a real examination here yet. Student access-code verification, server-side question delivery, and server-side marking must be completed before live use.</p>
-    <p class="muted">The former browser-only examination workflow has been disabled in this version because browser storage and JavaScript cannot protect examination answers or official results.</p>
+    <h2>CHELENQO Student Login</h2>
+    <p>Enter the secret examination access code issued by your school. Students do not need an email address.</p>
+    <form id="studentLoginForm">
+      <label for="studentAccessCode">Student access code</label>
+      <input id="studentAccessCode" type="password" autocomplete="off" required maxlength="100" placeholder="Enter your school access code">
+      <button type="submit" class="primary" id="studentLoginButton">Verify student code</button>
+      <p id="studentLoginMessage" role="alert" aria-live="polite"></p>
+    </form>
+    <div id="studentVerifiedPanel" class="success hidden">
+      <h3>Student identity verified</h3>
+      <p><strong>Name:</strong> <span id="verifiedStudentName"></span></p>
+      <p><strong>Student code:</strong> <span id="verifiedStudentCode"></span></p>
+      <p><strong>Grade:</strong> <span id="verifiedStudentGrade"></span></p>
+      <p><strong>Section:</strong> <span id="verifiedStudentSection"></span></p>
+      <p class="notice"><strong>Examinations are not yet available.</strong> Please wait for the school administrator to activate the secure examination system.</p>
+      <button type="button" class="danger" id="studentLogoutButton">Sign out</button>
+    </div>
+    <p class="muted">The former browser-only examination workflow remains disabled. Secure question delivery, server-side timing, marking, and results must be completed before live use.</p>
   </section>
 
   <section id="loginPanel" class="card hidden">
@@ -167,6 +182,97 @@ function showLoginError(message) {
   $("loginMessage").className = "error";
 }
 
+function showStudentMessage(message, isError = true) {
+  $("studentLoginMessage").textContent = message;
+  $("studentLoginMessage").className = isError ? "error" : "success";
+}
+
+async function studentLogin(event) {
+  event.preventDefault();
+
+  if (!supabaseClient) {
+    showStudentMessage("Supabase connection is unavailable.");
+    return;
+  }
+
+  const accessCode = $("studentAccessCode").value.trim();
+  if (!accessCode) {
+    showStudentMessage("Enter your school access code.");
+    return;
+  }
+
+  const button = $("studentLoginButton");
+  button.disabled = true;
+  button.textContent = "Verifying…";
+
+  try {
+    const { data: sessionData, error: sessionError } =
+      await supabaseClient.auth.getSession();
+    if (sessionError) throw sessionError;
+
+    if (sessionData.session) {
+      const userId = sessionData.session.user.id;
+      const { data: existingProfile, error: profileError } =
+        await supabaseClient
+          .from("profiles")
+          .select("role, school_id")
+          .eq("id", userId)
+          .maybeSingle();
+
+      if (profileError) throw profileError;
+      if (existingProfile && existingProfile.role === "admin") {
+        throw new Error("Please sign out of the administrator account before student login.");
+      }
+    } else {
+      const { error: anonymousError } =
+        await supabaseClient.auth.signInAnonymously();
+      if (anonymousError) throw anonymousError;
+    }
+
+    const { data, error } = await supabaseClient.rpc(
+      "verify_student_access_code",
+      { p_access_code: accessCode }
+    );
+    if (error) throw error;
+
+    const student = Array.isArray(data) ? data[0] : data;
+    if (!student || !student.student_code) {
+      throw new Error("Student verification was unsuccessful.");
+    }
+
+    $("verifiedStudentName").textContent = student.full_name;
+    $("verifiedStudentCode").textContent = student.student_code;
+    $("verifiedStudentGrade").textContent = String(student.grade_level);
+    $("verifiedStudentSection").textContent = student.section;
+
+    $("studentVerifiedPanel").classList.remove("hidden");
+    $("studentLoginForm").classList.add("hidden");
+    showStudentMessage("Student verified successfully.", false);
+  } catch (error) {
+    showStudentMessage(error.message || "Student verification failed.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Verify student code";
+  }
+}
+
+$("studentLoginForm").addEventListener("submit", studentLogin);
+
+$("studentLogoutButton").addEventListener("click", async () => {
+  if (supabaseClient) {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) {
+      showStudentMessage("Sign-out failed. Please try again.");
+      return;
+    }
+  }
+  $("studentLoginForm").reset();
+  $("studentLoginForm").classList.remove("hidden");
+  $("studentVerifiedPanel").classList.add("hidden");
+  $("studentLoginMessage").textContent = "You have signed out.";
+  $("studentLoginMessage").className = "muted";
+});
+
 function createClient() {
   if (!window.supabase || typeof window.supabase.createClient !== "function") {
     throw new Error("The Supabase client library could not be loaded. Check your internet connection and reload the page.");
@@ -221,9 +327,9 @@ async function refreshAdminSession() {
       profile.role !== "admin" ||
       profile.school_id !== REQUIRED_SCHOOL_ID
     ) {
-      await supabaseClient.auth.signOut();
+      // A non-admin session may be an anonymous student session.
+      // Do not sign it out during the administrator check.
       setAdminUi(false);
-      showLoginError("Access denied. A CHELENQO administrator profile is required. Ask the system administrator to verify the account.");
       return false;
     }
 
