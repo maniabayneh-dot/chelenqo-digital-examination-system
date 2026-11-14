@@ -302,7 +302,7 @@ let generatedCodeRows = [];
 
 function formatGeneratedCodes(rows) {
   const header = ["Student Code", "Full Name", "Grade", "Section", "Access Code", "Expires At"];
-  const lines = [header.join("\\t")];
+  const lines = [header.join("\t")];
   rows.forEach(row => {
     lines.push([
       row.student_code,
@@ -311,9 +311,9 @@ function formatGeneratedCodes(rows) {
       row.section,
       row.access_code,
       row.expires_at
-    ].join("\\t"));
+    ].join("\t"));
   });
-  return lines.join("\\n");
+  return lines.join("\n");
 }
 
 $("generateTestCodesButton").addEventListener("click", async () => {
@@ -394,7 +394,7 @@ $("downloadGeneratedCodesButton").addEventListener("click", () => {
     ])
   ];
   const csv = rows.map(row => row.map(escapeCsv).join(",")).join("\\r\\n");
-  const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
