@@ -59,7 +59,7 @@ footer{text-align:center;padding:20px;color:#64748b}
     <p>Enter the 8-character examination access code issued by your school. Use letters A–H, J–N, P–Z and digits 2–9. Students do not need an email address.</p>
     <form id="studentLoginForm">
       <label for="studentAccessCode">Student access code</label>
-      <input id="studentAccessCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" required minlength="8" maxlength="8" pattern="[A-HJ-NP-Z2-9]{8}" placeholder="AB7K29PX" title="Enter the 8-character access code">
+      <input id="studentAccessCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" required maxlength="100" placeholder="AB7K29PX" title="Enter your new 8-character code or previously issued legacy code">
       <button type="submit" class="primary" id="studentLoginButton">Verify student code</button>
       <p id="studentLoginMessage" role="alert" aria-live="polite"></p>
     </form>
@@ -210,8 +210,10 @@ async function studentLogin(event) {
   }
 
   const accessCode = $("studentAccessCode").value.trim().toUpperCase();
-  if (!/^[A-HJ-NP-Z2-9]{8}$/.test(accessCode)) {
-    showStudentMessage("Enter exactly 8 characters: letters A–H, J–N, P–Z and digits 2–9.");
+  const isNewCode = /^[A-HJ-NP-Z2-9]{8}$/.test(accessCode);
+  const isLegacyCode = /^CHS-ACCESS-[0-9A-F]{32}$/.test(accessCode);
+  if (!isNewCode && !isLegacyCode) {
+    showStudentMessage("Enter a valid 8-character code, or your previously issued legacy code.");
     $("studentAccessCode").focus();
     return;
   }
@@ -273,7 +275,7 @@ async function studentLogin(event) {
 
 $("studentAccessCode").addEventListener("input", () => {
   const field = $("studentAccessCode");
-  field.value = field.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, "").slice(0, 8);
+  field.value = field.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 100);
 });
 
 $("studentLoginForm").addEventListener("submit", studentLogin);
