@@ -7,568 +7,356 @@
 <title>CHELENQO Digital Examination System</title>
 <style>
 :root{--navy:#123c69;--blue:#1769aa;--green:#15803d;--red:#b91c1c;--bg:#f1f5f9;--ink:#172554}
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}
-header{background:var(--navy);color:white;text-align:center;padding:22px 12px}
-header h1{margin:5px;font-size:clamp(20px,4vw,28px)}
-header p{margin:6px}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--navy);color:white;text-align:center;padding:22px 12px}header h1{margin:5px;font-size:clamp(20px,4vw,28px)}header p{margin:6px}
 nav{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:12px;background:#e2e8f0}
 button{border:0;border-radius:7px;padding:12px 16px;background:var(--blue);color:white;font-size:15px;cursor:pointer;margin:3px}
-button:disabled{background:#94a3b8;cursor:not-allowed}
-button.primary{background:var(--green)}
-button.danger{background:var(--red)}
-button.secondary{background:#475569}
-.container{max-width:900px;margin:22px auto;padding:0 14px}
-.card{background:white;padding:20px;border-radius:12px;box-shadow:0 3px 12px #00000012;margin-bottom:18px}
-.hidden{display:none!important}
-label{display:block;font-weight:600;margin:12px 0 5px}
+button:disabled{background:#94a3b8;cursor:not-allowed}button.primary{background:var(--green)}button.danger{background:var(--red)}button.secondary{background:#475569}
+.container{max-width:960px;margin:22px auto;padding:0 14px}.card{background:white;padding:20px;border-radius:12px;box-shadow:0 3px 12px #00000012;margin-bottom:18px}
+.hidden{display:none!important}label{display:block;font-weight:600;margin:12px 0 5px}
 input,select,textarea{display:block;width:100%;padding:12px;margin:6px 0 12px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;background:white}
-textarea{min-height:220px;font-family:monospace;font-size:14px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .info{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-weight:bold}
 .notice{padding:12px;border-radius:8px;background:#fff7ed;color:#9a3412;line-height:1.5}
 .success{padding:12px;border-radius:8px;background:#f0fdf4;color:#166534;line-height:1.5}
-.error{color:#b91c1c;line-height:1.5}
-.muted{color:#64748b;font-size:14px}
-.item{padding:12px;border:1px solid #e2e8f0;border-radius:8px;margin:9px 0}
-footer{text-align:center;padding:20px;color:#64748b}
-.status{font-size:14px;font-weight:600}
+.error{color:#b91c1c;line-height:1.5}.muted{color:#64748b;font-size:14px}.item{padding:12px;border:1px solid #e2e8f0;border-radius:8px;margin:9px 0}
+.option{display:block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:7px;padding:13px;margin:10px 0;cursor:pointer;font-weight:normal}
+.option input{display:inline-block;width:auto;margin:0 10px 0 0}#timer{font-size:20px;color:var(--red)}
+.question{font-size:19px;font-weight:bold;margin:20px 0}footer{text-align:center;padding:20px;color:#64748b}
 @media(max-width:520px){.card{padding:15px}button{padding:11px 12px}}
 </style>
-<!-- Supabase JS v2 client library. The publishable key below is designed for browser use. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <header>
-  <h1>CHELENQO SECONDARY SCHOOL</h1>
-  <p>Digital Examination System</p>
-  <p>Grades 9–12 | Student Examinations and Teacher Dashboard</p>
+<h1>CHELENQO SECONDARY SCHOOL</h1>
+<p>Digital Examination System</p>
+<p>Grades 9–12 | Student Examinations and Teacher Dashboard</p>
 </header>
-
-<nav aria-label="Main navigation">
-  <button type="button" id="studentTab">Student Examination</button>
-  <button type="button" id="loginTab" class="secondary">Administrator Sign-in</button>
-  <button type="button" id="teacherTab" class="secondary hidden">Teacher / Admin Dashboard</button>
-  <button type="button" id="resultsTab" class="secondary hidden">Saved Results</button>
-  <button type="button" id="signOutTab" class="danger hidden">Sign out</button>
+<nav>
+<button id="studentTab" type="button">Student Examination</button>
+<button id="loginTab" type="button" class="secondary">Administrator Sign-in</button>
+<button id="teacherTab" type="button" class="secondary hidden">Teacher / Admin Dashboard</button>
+<button id="resultsTab" type="button" class="secondary hidden">Results</button>
+<button id="signOutTab" type="button" class="danger hidden">Sign out</button>
 </nav>
-
 <main class="container">
-  <section id="studentPanel" class="card">
-    <h2>CHELENQO Student Login</h2>
-    <p>Enter the 8-character examination access code issued by your school. Use letters A–H, J–N, P–Z and digits 2–9. Students do not need an email address.</p>
-    <form id="studentLoginForm">
-      <label for="studentAccessCode">Student access code</label>
-      <input id="studentAccessCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" required maxlength="100" placeholder="AB7K29PX" title="Enter your new 8-character code or previously issued legacy code">
-      <button type="submit" class="primary" id="studentLoginButton">Verify student code</button>
-      <p id="studentLoginMessage" role="alert" aria-live="polite"></p>
-    </form>
-    <div id="studentVerifiedPanel" class="success hidden">
-      <h3>Student identity verified</h3>
-      <p><strong>Name:</strong> <span id="verifiedStudentName"></span></p>
-      <p><strong>Student code:</strong> <span id="verifiedStudentCode"></span></p>
-      <p><strong>Grade:</strong> <span id="verifiedStudentGrade"></span></p>
-      <p><strong>Section:</strong> <span id="verifiedStudentSection"></span></p>
-      <p class="notice"><strong>Examinations are not yet available.</strong> Please wait for the school administrator to activate the secure examination system.</p>
-      <button type="button" class="danger" id="studentLogoutButton">Sign out</button>
-    </div>
-    <p class="muted">The former browser-only examination workflow remains disabled. Secure question delivery, server-side timing, marking, and results must be completed before live use.</p>
-  </section>
+<section id="studentPanel" class="card">
+<h2>CHELENQO Student Login</h2>
+<p>Enter the eight-character access code issued by the school.</p>
+<form id="studentLoginForm">
+<label for="studentAccessCode">Student access code</label>
+<input id="studentAccessCode" maxlength="100" required autocomplete="off" autocapitalize="characters" placeholder="AB7K29PX">
+<button id="studentLoginButton" class="primary">Verify student code</button>
+<p id="studentLoginMessage" role="alert"></p>
+</form>
+<div id="studentVerifiedPanel" class="hidden success">
+<h3>Student identity verified</h3>
+<p><b>Name:</b> <span id="verifiedStudentName"></span></p>
+<p><b>Student code:</b> <span id="verifiedStudentCode"></span></p>
+<p><b>Grade:</b> <span id="verifiedStudentGrade"></span></p>
+<p><b>Section:</b> <span id="verifiedStudentSection"></span></p>
+<button id="loadStudentExamsButton" type="button" class="primary">Load available examinations</button>
+<div id="studentExamList"></div>
+<button id="studentLogoutButton" type="button" class="danger">Student sign out</button>
+</div>
+</section>
 
-  <section id="loginPanel" class="card hidden">
-    <h2>CHELENQO Administrator Sign-in</h2>
-    <p>Sign in with the administrator account registered in the CHELENQO Supabase project.</p>
-    <form id="loginForm">
-      <label for="loginEmail">Administrator email</label>
-      <input id="loginEmail" type="email" autocomplete="username" required maxlength="254">
-      <label for="loginPassword">Password</label>
-      <input id="loginPassword" type="password" autocomplete="current-password" required maxlength="128">
-      <button type="submit" class="primary" id="loginButton">Sign in</button>
-      <p id="loginMessage" role="alert" aria-live="polite"></p>
-    </form>
-    <p class="muted">Only an authenticated account whose Supabase profile has role <strong>admin</strong> and school ID <strong>CHELENQO</strong> can open the administrator dashboard.</p>
-  </section>
+<section id="examPanel" class="card hidden">
+<div class="info"><span id="examStudentLabel"></span><span id="timer">00:00</span></div><hr>
+<div class="info"><span id="questionNumber"></span><span id="answeredCount"></span></div>
+<p id="questionText" class="question"></p>
+<div id="options"></div><hr>
+<button id="previousBtn" type="button" class="secondary">Previous</button>
+<button id="nextBtn" type="button">Next</button>
+<button id="submitBtn" type="button" class="danger">Submit examination</button>
+<p id="examMessage" role="alert"></p>
+</section>
 
-  <section id="teacherPanel" class="card hidden">
-    <div class="info">
-      <h2>Teacher / Administrator Dashboard</h2>
-      <span id="adminStatus" class="status"></span>
-    </div>
-    <p class="success"><strong>Administrator authentication is active.</strong> Access to this dashboard is checked against the Supabase profile. Database policies and server-side functions must still enforce authorization for every data operation.</p>
-    <p class="notice"><strong>Live-exam warning:</strong> Exam creation, student registration, question delivery, scoring, and results are not enabled in this file. They must be connected to the reviewed Supabase tables and protected RPC functions before real examinations can be conducted.</p>
+<section id="resultPanel" class="card hidden">
+<h2>Examination Result</h2>
+<p id="resultStudent"></p><p id="resultExam"></p>
+<h3 id="resultScore"></h3><p id="resultMessage"></p>
+<button id="returnStudent" type="button" class="primary">Return to student page</button>
+</section>
 
-    <hr>
-    <h3>Generate student access codes</h3>
-    <p>Generate a small test batch using clearly labelled test identities. Each examination access code is 8 random characters. The secure database function checks your administrator role, stores only code hashes, and returns each secret code once. Do not use these test identities for real students.</p>
-    <div class="notice">The 30 test codes will be created in the CHELENQO database and will expire after 365 days. Save the results securely when they appear; they cannot be retrieved from the database later.</div>
-    <button type="button" class="primary" id="generateTestCodesButton">Generate 30 test codes</button>
-    <p id="codeGenerationMessage" role="status" aria-live="polite"></p>
-    <div id="generatedCodesPanel" class="hidden">
-      <label for="generatedCodesOutput">One-time code list (copy and save securely now)</label>
-      <textarea id="generatedCodesOutput" readonly spellcheck="false" aria-label="Generated student access codes"></textarea>
-      <button type="button" id="copyGeneratedCodesButton">Copy code list</button>
-      <button type="button" class="secondary" id="downloadGeneratedCodesButton">Download CSV</button>
-      <p class="muted">This list is not saved in browser storage. Reloading or closing the page will remove it.</p>
-    </div>
+<section id="loginPanel" class="card hidden">
+<h2>Administrator Sign-in</h2>
+<form id="loginForm">
+<label for="loginEmail">Administrator email</label><input id="loginEmail" type="email" required autocomplete="username">
+<label for="loginPassword">Password</label><input id="loginPassword" type="password" required autocomplete="current-password">
+<button id="loginButton" class="primary">Sign in</button><p id="loginMessage" role="alert"></p>
+</form>
+<p class="muted">Only an authenticated CHELENQO administrator can use this dashboard.</p>
+</section>
 
-    <h3>Create an examination</h3>
-    <p>This form is retained as a design placeholder. It is disabled until a verified server-side exam-creation workflow is connected. Do not store answer keys in browser JavaScript or localStorage.</p>
-    <form id="examForm">
-      <div class="grid">
-        <div><label for="examGrade">Grade</label>
-          <select id="examGrade" disabled><option value="">Select grade</option><option>9</option><option>10</option><option>11</option><option>12</option></select>
-        </div>
-        <div><label for="examSubject">Subject</label>
-          <select id="examSubject" disabled><option value="">Select subject</option></select>
-        </div>
-        <div><label for="examTitle">Examination title</label><input id="examTitle" disabled placeholder="e.g. Unit 1 Assessment"></div>
-        <div><label for="examDuration">Duration (minutes)</label><input id="examDuration" type="number" min="1" max="240" value="60" disabled></div>
-      </div>
-      <label for="questionsJson">Questions</label>
-      <textarea id="questionsJson" disabled placeholder="Question authoring will be enabled after the secure database workflow is connected."></textarea>
-      <button type="button" disabled>Save Examination — not connected</button>
-    </form>
-    <hr>
-    <h3>Published examinations</h3>
-    <div id="examList" class="muted">Examination list will load from Supabase after the secure database workflow is connected.</div>
-  </section>
+<section id="teacherPanel" class="card hidden">
+<h2>Teacher / Administrator Dashboard</h2>
+<p id="adminStatus" class="success"></p>
+<h3>Generate test student access codes</h3>
+<p class="notice">Creates 30 TEST-ONLY records. Save the one-time codes securely. Do not use these identities for real students.</p>
+<button id="generateTestCodesButton" type="button" class="primary">Generate 30 test codes</button>
+<p id="codeGenerationMessage" role="status"></p>
+<div id="generatedCodesPanel" class="hidden">
+<textarea id="generatedCodesOutput" readonly></textarea>
+<button id="copyGeneratedCodesButton" type="button">Copy code list</button>
+<button id="downloadGeneratedCodesButton" type="button" class="secondary">Download CSV</button>
+</div>
+<hr>
+<h3>Create an examination</h3>
+<form id="examForm">
+<div class="grid">
+<div><label for="examGrade">Grade</label><select id="examGrade" required><option value="">Select grade</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select></div>
+<div><label for="examSubject">Subject</label><select id="examSubject" required><option value="">Select grade first</option></select></div>
+<div><label for="examTitle">Examination title</label><input id="examTitle" required maxlength="200"></div>
+<div><label for="examDuration">Duration (minutes)</label><input id="examDuration" type="number" min="1" max="240" value="60" required></div>
+</div>
+<label for="questionsJson">Questions (JSON)</label>
+<textarea id="questionsJson" required spellcheck="false">[
+  {
+    "question": "Which of the following is a strong acid?",
+    "options": ["CH3COOH", "HCl", "H2CO3", "HF"],
+    "answer": 1,
+    "marks": 1
+  }
+]</textarea>
+<p class="muted">Each question needs question, options, answer (zero-based index), and optional marks.</p>
+<button class="primary">Create examination</button><p id="teacherMessage" role="status"></p>
+</form>
+<hr><h3>Examinations</h3><div id="examList"></div>
+</section>
 
-  <section id="resultsPanel" class="card hidden">
-    <h2>Examination Results</h2>
-    <p class="notice">Results are not read from browser storage. The secure results view will be enabled after database queries and row-level security policies are tested.</p>
-    <div id="resultsList" class="muted">No browser-stored results are used by this version.</div>
-  </section>
+<section id="resultsPanel" class="card hidden">
+<h2>Examination Results</h2><div id="resultsList"></div>
+</section>
 </main>
-
 <footer>&copy; 2026 Chelenqo Secondary School</footer>
-
 <script>
 "use strict";
+const SUPABASE_URL="https://yqwbdpsbtugunmtbvito.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
+const REQUIRED_SCHOOL_ID="CHELENQO";
+const $=id=>document.getElementById(id);
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+ auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
+});
+const panels=["studentPanel","examPanel","resultPanel","loginPanel","teacherPanel","resultsPanel"];
+let student=null, activeExam=null, questions=[], answers={}, currentQuestion=0, attemptId=null;
+let timerHandle=null, secondsLeft=0, authenticatedAdmin=false, currentSubjects=[];
+let generatedCodeRows=[];
 
-/*
- * CHELENQO secure-admin-login front-end foundation.
- *
- * IMPORTANT:
- * - The Supabase publishable key is public by design. Never put a service_role key here.
- * - UI checks are not a security boundary. RLS and secure RPC functions must protect data.
- * - Student exams, answer keys, scoring and results are deliberately disabled until
- *   the reviewed server-side workflows are connected.
- */
+function showPanel(id){panels.forEach(p=>$(p).classList.toggle("hidden",p!==id));}
+function message(id,text,kind="error"){$(id).textContent=text;$(id).className=kind;}
+function escapeCsv(v){return '"'+String(v??"").replace(/"/g,'""')+'"';}
 
-const SUPABASE_URL = "https://yqwbdpsbtugunmtbvito.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
-const REQUIRED_SCHOOL_ID = "CHELENQO";
-
-const $ = id => document.getElementById(id);
-const panels = ["studentPanel", "loginPanel", "teacherPanel", "resultsPanel"];
-let authenticatedAdmin = false;
-let currentUserId = null;
-let authCheckInProgress = false;
-let authCheckQueued = false;
-
-function showPanel(panelId) {
-  panels.forEach(id => $(id).classList.toggle("hidden", id !== panelId));
-  $("studentTab").classList.toggle("secondary", panelId !== "studentPanel");
-  $("loginTab").classList.toggle("secondary", panelId !== "loginPanel");
-  $("teacherTab").classList.toggle("secondary", panelId !== "teacherPanel");
-  $("resultsTab").classList.toggle("secondary", panelId !== "resultsPanel");
+async function refreshAdmin(){
+ const {data:{session}}=await db.auth.getSession();
+ if(!session){setAdmin(false);return false;}
+ const {data:p,error}=await db.from("profiles").select("role,school_id").eq("id",session.user.id).maybeSingle();
+ const ok=!error&&p&&p.role==="admin"&&p.school_id===REQUIRED_SCHOOL_ID;
+ setAdmin(!!ok,session.user.id);return !!ok;
 }
+function setAdmin(ok,id=null){
+ authenticatedAdmin=ok;
+ $("teacherTab").classList.toggle("hidden",!ok);
+ $("resultsTab").classList.toggle("hidden",!ok);
+ $("signOutTab").classList.toggle("hidden",!ok);
+ $("loginTab").classList.toggle("hidden",ok);
+ $("adminStatus").textContent=ok?"Verified CHELENQO administrator":"";
+ if(!ok&&(! $("teacherPanel").classList.contains("hidden")||!$("resultsPanel").classList.contains("hidden")))showPanel("studentPanel");
+}
+$("studentAccessCode").addEventListener("input",e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g,""));
 
-function setAdminUi(isAdmin, userId = null) {
-  authenticatedAdmin = Boolean(isAdmin);
-  currentUserId = authenticatedAdmin ? userId : null;
-
-  $("teacherTab").classList.toggle("hidden", !authenticatedAdmin);
-  $("resultsTab").classList.toggle("hidden", !authenticatedAdmin);
-  $("signOutTab").classList.toggle("hidden", !authenticatedAdmin);
-  $("loginTab").classList.toggle("hidden", authenticatedAdmin);
-
-  if (!authenticatedAdmin && ( $("teacherPanel").classList.contains("hidden") === false ||
-                               $("resultsPanel").classList.contains("hidden") === false )) {
-    showPanel("studentPanel");
+$("studentLoginForm").addEventListener("submit",async e=>{
+ e.preventDefault();const btn=$("studentLoginButton");btn.disabled=true;
+ try{
+  const code=$("studentAccessCode").value.trim().toUpperCase();
+  if(!(/^[A-HJ-NP-Z2-9]{8}$/.test(code)||/^CHS-ACCESS-[0-9A-F]{32}$/.test(code)))throw Error("Enter a valid 8-character code.");
+  const {data:{session}}=await db.auth.getSession();
+  if(session){
+   const {data:p}=await db.from("profiles").select("role").eq("id",session.user.id).maybeSingle();
+   if(p?.role==="admin")throw Error("Sign out of the administrator account before student login.");
+  }else{
+   const {error}=await db.auth.signInAnonymously();if(error)throw error;
   }
-
-  $("adminStatus").textContent = authenticatedAdmin ? "Verified CHELENQO administrator" : "";
-}
-
-function showLoginError(message) {
-  $("loginMessage").textContent = message;
-  $("loginMessage").className = "error";
-}
-
-function showStudentMessage(message, isError = true) {
-  $("studentLoginMessage").textContent = message;
-  $("studentLoginMessage").className = isError ? "error" : "success";
-}
-
-async function studentLogin(event) {
-  event.preventDefault();
-
-  if (!supabaseClient) {
-    showStudentMessage("Supabase connection is unavailable.");
-    return;
-  }
-
-  const accessCode = $("studentAccessCode").value.trim().toUpperCase();
-  const isNewCode = /^[A-HJ-NP-Z2-9]{8}$/.test(accessCode);
-  const isLegacyCode = /^CHS-ACCESS-[0-9A-F]{32}$/.test(accessCode);
-  if (!isNewCode && !isLegacyCode) {
-    showStudentMessage("Enter a valid 8-character code, or your previously issued legacy code.");
-    $("studentAccessCode").focus();
-    return;
-  }
-
-  const button = $("studentLoginButton");
-  button.disabled = true;
-  button.textContent = "Verifying…";
-
-  try {
-    const { data: sessionData, error: sessionError } =
-      await supabaseClient.auth.getSession();
-    if (sessionError) throw sessionError;
-
-    if (sessionData.session) {
-      const userId = sessionData.session.user.id;
-      const { data: existingProfile, error: profileError } =
-        await supabaseClient
-          .from("profiles")
-          .select("role, school_id")
-          .eq("id", userId)
-          .maybeSingle();
-
-      if (profileError) throw profileError;
-      if (existingProfile && existingProfile.role === "admin") {
-        throw new Error("Please sign out of the administrator account before student login.");
-      }
-    } else {
-      const { error: anonymousError } =
-        await supabaseClient.auth.signInAnonymously();
-      if (anonymousError) throw anonymousError;
-    }
-
-    const { data, error } = await supabaseClient.rpc(
-      "verify_student_access_code",
-      { p_access_code: accessCode }
-    );
-    if (error) throw error;
-
-    const student = Array.isArray(data) ? data[0] : data;
-    if (!student || !student.student_code) {
-      throw new Error("Student verification was unsuccessful.");
-    }
-
-    $("verifiedStudentName").textContent = student.full_name;
-    $("verifiedStudentCode").textContent = student.student_code;
-    $("verifiedStudentGrade").textContent = String(student.grade_level);
-    $("verifiedStudentSection").textContent = student.section;
-
-    $("studentVerifiedPanel").classList.remove("hidden");
-    $("studentLoginForm").classList.add("hidden");
-    showStudentMessage("Student verified successfully.", false);
-  } catch (error) {
-    showStudentMessage(error.message || "Student verification failed.");
-  } finally {
-    button.disabled = false;
-    button.textContent = "Verify student code";
-  }
-}
-
-$("studentAccessCode").addEventListener("input", () => {
-  const field = $("studentAccessCode");
-  field.value = field.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 100);
+  const {data,error}=await db.rpc("verify_student_access_code",{p_access_code:code});if(error)throw error;
+  student=Array.isArray(data)?data[0]:data;if(!student?.student_code)throw Error("Student verification failed.");
+  $("verifiedStudentName").textContent=student.full_name;
+  $("verifiedStudentCode").textContent=student.student_code;
+  $("verifiedStudentGrade").textContent=student.grade_level;
+  $("verifiedStudentSection").textContent=student.section;
+  $("studentLoginForm").classList.add("hidden");$("studentVerifiedPanel").classList.remove("hidden");
+  message("studentLoginMessage","Student verified successfully.","success");
+ }catch(err){message("studentLoginMessage",err.message||"Verification failed.");}
+ finally{btn.disabled=false;}
 });
 
-$("studentLoginForm").addEventListener("submit", studentLogin);
-
-$("studentLogoutButton").addEventListener("click", async () => {
-  if (supabaseClient) {
-    const { error } = await supabaseClient.auth.signOut();
-    if (error) {
-      showStudentMessage("Sign-out failed. Please try again.");
-      return;
-    }
-  }
-  $("studentLoginForm").reset();
-  $("studentLoginForm").classList.remove("hidden");
-  $("studentVerifiedPanel").classList.add("hidden");
-  $("studentLoginMessage").textContent = "You have signed out.";
-  $("studentLoginMessage").className = "muted";
-});
-
-function buildTestStudentRows() {
-  return Array.from({ length: 30 }, (_, index) => {
-    const grade = index < 8 ? 9 : index < 16 ? 10 : index < 23 ? 11 : 12;
-    return {
-      full_name: "TEST STUDENT " + String(index + 1).padStart(2, "0"),
-      grade_level: grade,
-      section: index % 2 === 0 ? "TEST-A" : "TEST-B"
-    };
+$("loadStudentExamsButton").addEventListener("click",loadStudentExams);
+async function loadStudentExams(){
+ const box=$("studentExamList");box.textContent="Loading examinations…";
+ try{
+  const {data,error}=await db.from("exams").select("id,title,grade_level,duration_minutes,total_marks,subject_id")
+   .eq("is_published",true).eq("grade_level",Number(student.grade_level)).order("created_at",{ascending:false});
+  if(error)throw error;
+  if(!data?.length){box.textContent="No published examinations are available for your grade.";return;}
+  const ids=[...new Set(data.map(x=>x.subject_id).filter(Boolean))];
+  const {data:subs,error:se}=await db.from("subjects").select("id,subject_name").in("id",ids);if(se)throw se;
+  const names=Object.fromEntries((subs||[]).map(s=>[s.id,s.subject_name]));
+  box.innerHTML="";
+  data.forEach(ex=>{
+   const item=document.createElement("div");item.className="item";
+   const title=document.createElement("strong");title.textContent=(names[ex.subject_id]||"Subject")+" — "+ex.title;
+   const details=document.createElement("p");details.className="muted";details.textContent=`${ex.duration_minutes} minutes | ${ex.total_marks} marks`;
+   const start=document.createElement("button");start.type="button";start.className="primary";start.textContent="Start examination";
+   start.addEventListener("click",()=>startExam(ex));item.append(title,details,start);box.append(item);
   });
+ }catch(err){box.textContent=err.message||"Could not load examinations.";}
 }
+async function startExam(ex){
+ try{
+  const {data:aid,error:ae}=await db.rpc("start_student_exam",{p_exam_id:ex.id});if(ae)throw ae;
+  attemptId=aid;activeExam=ex;
+  const {data:q,error:qe}=await db.from("exam_questions").select("id,question_text,options,marks,question_order").eq("exam_id",ex.id).order("question_order");
+  if(qe)throw qe;if(!q?.length)throw Error("This examination has no questions.");
+  questions=q;answers={};currentQuestion=0;secondsLeft=Number(ex.duration_minutes)*60;
+  $("examStudentLabel").textContent=`${student.full_name} | Grade ${student.grade_level}`;
+  showPanel("examPanel");renderQuestion();updateTimer();clearInterval(timerHandle);
+  timerHandle=setInterval(()=>{secondsLeft--;updateTimer();if(secondsLeft<=0)submitExam(true);},1000);
+ }catch(err){alert(err.message||"Could not start examination.");}
+}
+function updateTimer(){const m=Math.floor(secondsLeft/60),s=secondsLeft%60;$("timer").textContent=String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");}
+function renderQuestion(){
+ const q=questions[currentQuestion];$("questionNumber").textContent=`Question ${currentQuestion+1} of ${questions.length}`;
+ $("answeredCount").textContent=`Answered: ${Object.keys(answers).length}`;$("questionText").textContent=q.question_text;
+ const box=$("options");box.innerHTML="";
+ q.options.forEach((opt,i)=>{
+  const label=document.createElement("label");label.className="option";
+  const radio=document.createElement("input");radio.type="radio";radio.name="answer";radio.checked=answers[q.id]===String.fromCharCode(65+i);
+  radio.addEventListener("change",()=>{answers[q.id]=String.fromCharCode(65+i);renderQuestion();});
+  label.append(radio,document.createTextNode(`${String.fromCharCode(65+i)}. ${opt}`));box.append(label);
+ });
+ $("previousBtn").disabled=currentQuestion===0;$("nextBtn").disabled=currentQuestion===questions.length-1;
+}
+$("previousBtn").addEventListener("click",()=>{if(currentQuestion>0){currentQuestion--;renderQuestion();}});
+$("nextBtn").addEventListener("click",()=>{if(currentQuestion<questions.length-1){currentQuestion++;renderQuestion();}});
+$("submitBtn").addEventListener("click",()=>submitExam(false));
+async function submitExam(expired){
+ if(!attemptId||!activeExam)return;
+ if(!expired&&!confirm("Submit your examination now? You cannot try again."))return;
+ $("submitBtn").disabled=true;clearInterval(timerHandle);message("examMessage","Submitting answers…","muted");
+ try{
+  const {data:score,error}=await db.rpc("submit_exam_answers",{p_attempt_id:attemptId,p_answers:answers});if(error)throw error;
+  $("resultStudent").textContent=`Student: ${student.full_name} | ${student.student_code}`;
+  $("resultExam").textContent=activeExam.title;
+  $("resultScore").textContent=`Score: ${score} / ${activeExam.total_marks}`;
+  $("resultMessage").textContent=expired?"Time expired. The answers received by the server were submitted.":"Your examination was submitted and graded by the database.";
+  showPanel("resultPanel");
+ }catch(err){message("examMessage",err.message||"Submission failed. Keep this page open and try again.");$("submitBtn").disabled=false;}
+}
+$("returnStudent").addEventListener("click",()=>{attemptId=null;activeExam=null;$("submitBtn").disabled=false;showPanel("studentPanel");});
+$("studentLogoutButton").addEventListener("click",async()=>{
+ clearInterval(timerHandle);await db.auth.signOut();student=null;
+ $("studentLoginForm").reset();$("studentLoginForm").classList.remove("hidden");$("studentVerifiedPanel").classList.add("hidden");
+ $("studentExamList").innerHTML="";message("studentLoginMessage","Signed out.","muted");showPanel("studentPanel");
+});
 
-let generatedCodeRows = [];
+$("loginForm").addEventListener("submit",async e=>{
+ e.preventDefault();$("loginButton").disabled=true;
+ try{
+  const {error}=await db.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value});if(error)throw error;
+  if(!await refreshAdmin()){await db.auth.signOut();throw Error("This account is not a CHELENQO administrator.");}
+  $("loginForm").reset();await loadSubjects();await renderExamList();showPanel("teacherPanel");
+ }catch(err){message("loginMessage",err.message||"Sign-in failed.");}
+ finally{$("loginButton").disabled=false;}
+});
+async function loadSubjects(){
+ const {data,error}=await db.from("subjects").select("id,subject_name,grade_level").order("grade_level").order("subject_name");if(error)throw error;
+ currentSubjects=data||[];fillSubjectOptions();
+}
+function fillSubjectOptions(){
+ const grade=$("examGrade").value;const sel=$("examSubject");sel.innerHTML='<option value="">Select subject</option>';
+ currentSubjects.filter(s=>String(s.grade_level)===grade).forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=s.subject_name;sel.append(o);});
+}
+$("examGrade").addEventListener("change",fillSubjectOptions);
 
-function formatGeneratedCodes(rows) {
-  const header = ["Student Code", "Full Name", "Grade", "Section", "Access Code", "Expires At"];
-  const lines = [header.join("\t")];
-  rows.forEach(row => {
-    lines.push([
-      row.student_code,
-      row.full_name,
-      row.grade_level,
-      row.section,
-      row.access_code,
-      row.expires_at
-    ].join("\t"));
+function testRows(){return Array.from({length:30},(_,i)=>({full_name:"TEST STUDENT "+String(i+1).padStart(2,"0"),grade_level:i<8?9:i<16?10:i<23?11:12,section:i%2===0?"TEST-A":"TEST-B"}));}
+$("generateTestCodesButton").addEventListener("click",async()=>{
+ if(!await refreshAdmin()){message("codeGenerationMessage","Administrator sign-in required.");return;}
+ if(!confirm("Create 30 TEST-ONLY records?"))return;
+ const b=$("generateTestCodesButton");b.disabled=true;
+ try{
+  const {data,error}=await db.rpc("create_student_access_codes_secure",{p_rows:testRows()});if(error)throw error;
+  if(!Array.isArray(data)||data.length!==30)throw Error("Unexpected result count. Check database before retrying.");
+  generatedCodeRows=data;
+  $("generatedCodesOutput").value=["Student Code\tFull Name\tGrade\tSection\tAccess Code\tExpires At",...data.map(r=>[r.student_code,r.full_name,r.grade_level,r.section,r.access_code,r.expires_at].join("\t"))].join("\n");
+  $("generatedCodesPanel").classList.remove("hidden");message("codeGenerationMessage","30 test codes created. Save the list now.","success");
+ }catch(err){message("codeGenerationMessage",err.message||"Generation failed.");}finally{b.disabled=false;}
+});
+$("copyGeneratedCodesButton").addEventListener("click",async()=>{
+ try{await navigator.clipboard.writeText($("generatedCodesOutput").value);message("codeGenerationMessage","Copied. Save the list securely.","success");}
+ catch(e){$("generatedCodesOutput").select();message("codeGenerationMessage","Text selected; use Copy on your device.","muted");}
+});
+$("downloadGeneratedCodesButton").addEventListener("click",()=>{
+ if(!generatedCodeRows.length)return;
+ const rows=[["Student Code","Full Name","Grade","Section","Access Code","Expires At"],...generatedCodeRows.map(r=>[r.student_code,r.full_name,r.grade_level,r.section,r.access_code,r.expires_at])];
+ const csv=rows.map(r=>r.map(escapeCsv).join(",")).join("\r\n");
+ const url=URL.createObjectURL(new Blob(["\uFEFF",csv],{type:"text/csv;charset=utf-8"}));
+ const a=document.createElement("a");a.href=url;a.download="CHELENQO-TEST-STUDENT-CODES.csv";a.click();URL.revokeObjectURL(url);
+});
+
+$("examForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ if(!await refreshAdmin()){message("teacherMessage","Administrator sign-in required.");return;}
+ let raw;
+ try{raw=JSON.parse($("questionsJson").value);}catch(err){message("teacherMessage","Invalid JSON: "+err.message);return;}
+ if(!Array.isArray(raw)||!raw.length){message("teacherMessage","Add at least one question.");return;}
+ const valid=raw.every(q=>q&&typeof q.question==="string"&&q.question.trim()&&Array.isArray(q.options)&&q.options.length>=2&&q.options.length<=6&&q.options.every(x=>typeof x==="string"&&x.trim())&&Number.isInteger(q.answer)&&q.answer>=0&&q.answer<q.options.length);
+ if(!valid){message("teacherMessage","Each question needs text, 2–6 options and a valid zero-based answer index.");return;}
+ const payload=raw.map(q=>({question_text:q.question.trim(),options:q.options,correct_option:q.answer,marks:Number.isInteger(q.marks)&&q.marks>0?q.marks:1,explanation:q.explanation||null}));
+ try{
+  const {data:id,error}=await db.rpc("create_teacher_exam",{p_title:$("examTitle").value.trim(),p_grade_level:Number($("examGrade").value),p_subject_id:$("examSubject").value,p_duration_minutes:Number($("examDuration").value),p_questions:payload});
+  if(error)throw error;message("teacherMessage","Examination created as unpublished. Review and publish it below.","success");
+  $("examForm").reset();fillSubjectOptions();await renderExamList();
+ }catch(err){message("teacherMessage",err.message||"Exam creation failed.");}
+});
+async function renderExamList(){
+ const box=$("examList");box.textContent="Loading…";
+ try{
+  const {data,error}=await db.from("exams").select("id,title,grade_level,duration_minutes,total_marks,is_published,subject_id").order("created_at",{ascending:false});if(error)throw error;
+  const {data:subs,error:se}=await db.from("subjects").select("id,subject_name");if(se)throw se;
+  const names=Object.fromEntries((subs||[]).map(s=>[s.id,s.subject_name]));box.innerHTML="";
+  (data||[]).forEach(ex=>{
+   const item=document.createElement("div");item.className="item";
+   const title=document.createElement("strong");title.textContent=`Grade ${ex.grade_level} — ${names[ex.subject_id]||"Subject"}: ${ex.title}`;
+   const detail=document.createElement("p");detail.className="muted";detail.textContent=`${ex.duration_minutes} minutes | ${ex.total_marks} marks | ${ex.is_published?"Published":"Unpublished"}`;
+   item.append(title,detail);
+   const btn=document.createElement("button");btn.type="button";btn.className=ex.is_published?"secondary":"primary";btn.textContent=ex.is_published?"Unpublish":"Publish";
+   btn.addEventListener("click",async()=>{
+    try{const {error}=await db.rpc("publish_teacher_exam",{p_exam_id:ex.id,p_publish:!ex.is_published});if(error)throw error;await renderExamList();}
+    catch(err){alert(err.message||"Could not change publication status.");}
+   });item.append(btn);box.append(item);
   });
-  return lines.join("\n");
+  if(!data?.length)box.textContent="No examinations have been created.";
+ }catch(err){box.textContent=err.message||"Could not load examinations.";}
 }
-
-$("generateTestCodesButton").addEventListener("click", async () => {
-  const button = $("generateTestCodesButton");
-  const message = $("codeGenerationMessage");
-  if (!supabaseClient) {
-    message.textContent = "Supabase connection is unavailable.";
-    message.className = "error";
-    return;
-  }
-  if (!authenticatedAdmin || !currentUserId) {
-    message.textContent = "Administrator sign-in is required. Please sign in again.";
-    message.className = "error";
-    return;
-  }
-  const verified = await refreshAdminSession();
-  if (!verified) {
-    message.textContent = "Administrator verification failed. Please sign in again.";
-    message.className = "error";
-    return;
-  }
-  if (!window.confirm("Create 30 TEST-ONLY student records in the CHELENQO database? These are not real student identities.")) {
-    return;
-  }
-
-  button.disabled = true;
-  button.textContent = "Generating…";
-  message.textContent = "Checking administrator authorization and generating the test batch…";
-  message.className = "muted";
-  $("generatedCodesPanel").classList.add("hidden");
-  $("generatedCodesOutput").value = "";
-  generatedCodeRows = [];
-
-  try {
-    const { data, error } = await supabaseClient.rpc(
-      "create_student_access_codes_secure",
-      { p_rows: buildTestStudentRows() }
-    );
-    if (error) throw error;
-    if (!Array.isArray(data) || data.length !== 30) {
-      throw new Error("The database did not return the expected 30 records. Check the database count before trying again.");
-    }
-    generatedCodeRows = data;
-    $("generatedCodesOutput").value = formatGeneratedCodes(data);
-    $("generatedCodesPanel").classList.remove("hidden");
-    message.textContent = "Success: 30 test codes were generated. Save the one-time list securely now.";
-    message.className = "success";
-  } catch (error) {
-    message.textContent = error.message || "Code generation failed. No codes should be assumed to have been created.";
-    message.className = "error";
-  } finally {
-    button.disabled = false;
-    button.textContent = "Generate 30 test codes";
-  }
-});
-
-$("copyGeneratedCodesButton").addEventListener("click", async () => {
-  const output = $("generatedCodesOutput");
-  try {
-    await navigator.clipboard.writeText(output.value);
-    $("codeGenerationMessage").textContent = "Code list copied. Save it securely.";
-    $("codeGenerationMessage").className = "success";
-  } catch (error) {
-    output.focus();
-    output.select();
-    $("codeGenerationMessage").textContent = "Automatic copy was blocked. The list is selected; use your device's Copy command.";
-    $("codeGenerationMessage").className = "muted";
-  }
-});
-
-$("downloadGeneratedCodesButton").addEventListener("click", () => {
-  if (!generatedCodeRows.length) return;
-  const escapeCsv = value => '"' + String(value ?? "").replace(/"/g, '""') + '"';
-  const rows = [
-    ["Student Code", "Full Name", "Grade", "Section", "Access Code", "Expires At"],
-    ...generatedCodeRows.map(row => [
-      row.student_code, row.full_name, row.grade_level, row.section, row.access_code, row.expires_at
-    ])
-  ];
-  const csv = rows.map(row => row.map(escapeCsv).join(",")).join("\\r\\n");
-  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "CHELENQO-TEST-STUDENT-CODES.csv";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-});
-
-function createClient() {
-  if (!window.supabase || typeof window.supabase.createClient !== "function") {
-    throw new Error("The Supabase client library could not be loaded. Check your internet connection and reload the page.");
-  }
-  return window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true
-    }
-  });
+async function renderResults(){
+ const box=$("resultsList");box.textContent="Loading…";
+ try{
+  if(!await refreshAdmin())throw Error("Administrator sign-in required.");
+  const {data,error}=await db.from("exam_attempts").select("id,exam_id,student_id,score,status,submitted_at").order("submitted_at",{ascending:false}).limit(500);if(error)throw error;
+  const {data:exams,error:ee}=await db.from("exams").select("id,title");if(ee)throw ee;
+  const titles=Object.fromEntries((exams||[]).map(e=>[e.id,e.title]));box.innerHTML="";
+  (data||[]).forEach(r=>{const d=document.createElement("div");d.className="item";d.textContent=`${titles[r.exam_id]||"Exam"} | Student account ${r.student_id} | Score ${r.score??"—"} | ${r.status} | ${r.submitted_at||"Not submitted"}`;box.append(d);});
+  if(!data?.length)box.textContent="No attempts recorded yet.";
+ }catch(err){box.textContent=err.message||"Could not load results.";}
 }
-
-let supabaseClient;
-try {
-  supabaseClient = createClient();
-} catch (error) {
-  $("loginTab").disabled = true;
-  $("loginMessage").textContent = error.message;
-}
-
-async function refreshAdminSession() {
-  if (!supabaseClient) {
-    setAdminUi(false);
-    return false;
-  }
-  if (authCheckInProgress) {
-    authCheckQueued = true;
-    return false;
-  }
-
-  authCheckInProgress = true;
-  try {
-    const { data: sessionData, error: sessionError } =
-      await supabaseClient.auth.getSession();
-
-    if (sessionError || !sessionData || !sessionData.session) {
-      setAdminUi(false);
-      return false;
-    }
-
-    const userId = sessionData.session.user.id;
-    const { data: profile, error: profileError } = await supabaseClient
-      .from("profiles")
-      .select("role, school_id")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (
-      profileError ||
-      !profile ||
-      profile.role !== "admin" ||
-      profile.school_id !== REQUIRED_SCHOOL_ID
-    ) {
-      // A non-admin session may be an anonymous student session.
-      // Do not sign it out during the administrator check.
-      setAdminUi(false);
-      return false;
-    }
-
-    setAdminUi(true, userId);
-    $("loginMessage").textContent = "";
-    return true;
-  } catch (error) {
-    setAdminUi(false);
-    showLoginError("Could not verify administrator access. Check your connection and try again.");
-    return false;
-  } finally {
-    authCheckInProgress = false;
-    if (authCheckQueued) {
-      authCheckQueued = false;
-      queueMicrotask(() => refreshAdminSession());
-    }
-  }
-}
-
-$("loginForm").addEventListener("submit", async event => {
-  event.preventDefault();
-  if (!supabaseClient) {
-    showLoginError("Supabase is not available. Reload the page and try again.");
-    return;
-  }
-
-  const email = $("loginEmail").value.trim();
-  const password = $("loginPassword").value;
-  if (!email || !password) {
-    showLoginError("Enter your administrator email and password.");
-    return;
-  }
-
-  $("loginButton").disabled = true;
-  $("loginButton").textContent = "Signing in…";
-  $("loginMessage").textContent = "";
-
-  try {
-    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) {
-      showLoginError("Sign-in failed. Check your email and password.");
-      return;
-    }
-
-    const verified = await refreshAdminSession();
-    if (verified) {
-      $("loginForm").reset();
-      showPanel("teacherPanel");
-    }
-  } catch (error) {
-    showLoginError("Sign-in could not be completed. Check your internet connection and try again.");
-  } finally {
-    $("loginButton").disabled = false;
-    $("loginButton").textContent = "Sign in";
-  }
-});
-
-$("studentTab").addEventListener("click", () => showPanel("studentPanel"));
-$("loginTab").addEventListener("click", () => showPanel("loginPanel"));
-$("teacherTab").addEventListener("click", async () => {
-  if (!authenticatedAdmin) {
-    showPanel("loginPanel");
-    return;
-  }
-  const verified = await refreshAdminSession();
-  showPanel(verified ? "teacherPanel" : "loginPanel");
-});
-$("resultsTab").addEventListener("click", async () => {
-  if (!authenticatedAdmin) {
-    showPanel("loginPanel");
-    return;
-  }
-  const verified = await refreshAdminSession();
-  showPanel(verified ? "resultsPanel" : "loginPanel");
-});
-$("signOutTab").addEventListener("click", async () => {
-  if (supabaseClient) {
-    await supabaseClient.auth.signOut();
-  }
-  setAdminUi(false);
-  $("loginForm").reset();
-  $("loginMessage").textContent = "You have signed out.";
-  $("loginMessage").className = "muted";
-  showPanel("studentPanel");
-});
-
-/*
- * Supabase emits auth events during sign-in/out. Defer the session check so
- * the auth event callback does not block Supabase's own auth processing.
- */
-if (supabaseClient) {
-  supabaseClient.auth.onAuthStateChange(() => {
-    setTimeout(() => refreshAdminSession(), 0);
-  });
-}
-
-setAdminUi(false);
-showPanel("studentPanel");
-refreshAdminSession();
+$("studentTab").addEventListener("click",()=>showPanel("studentPanel"));
+$("loginTab").addEventListener("click",()=>showPanel("loginPanel"));
+$("teacherTab").addEventListener("click",async()=>{if(await refreshAdmin()){await loadSubjects();await renderExamList();showPanel("teacherPanel");}else showPanel("loginPanel");});
+$("resultsTab").addEventListener("click",async()=>{await renderResults();showPanel("resultsPanel");});
+$("signOutTab").addEventListener("click",async()=>{await db.auth.signOut();setAdmin(false);showPanel("studentPanel");});
+db.auth.onAuthStateChange(()=>{setTimeout(()=>refreshAdmin(),0);});
+setAdmin(false);showPanel("studentPanel");refreshAdmin();
 </script>
 </body>
 </html>
