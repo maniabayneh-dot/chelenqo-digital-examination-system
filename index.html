@@ -56,10 +56,10 @@ footer{text-align:center;padding:20px;color:#64748b}
 <main class="container">
   <section id="studentPanel" class="card">
     <h2>CHELENQO Student Login</h2>
-    <p>Enter the secret examination access code issued by your school. Students do not need an email address.</p>
+    <p>Enter the 8-character examination access code issued by your school. Use letters A–H, J–N, P–Z and digits 2–9. Students do not need an email address.</p>
     <form id="studentLoginForm">
       <label for="studentAccessCode">Student access code</label>
-      <input id="studentAccessCode" type="password" autocomplete="off" required maxlength="100" placeholder="Enter your school access code">
+      <input id="studentAccessCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" required minlength="8" maxlength="8" pattern="[A-HJ-NP-Z2-9]{8}" placeholder="AB7K29PX" title="Enter the 8-character access code">
       <button type="submit" class="primary" id="studentLoginButton">Verify student code</button>
       <p id="studentLoginMessage" role="alert" aria-live="polite"></p>
     </form>
@@ -99,7 +99,7 @@ footer{text-align:center;padding:20px;color:#64748b}
 
     <hr>
     <h3>Generate student access codes</h3>
-    <p>Generate a small test batch using clearly labelled test identities. The secure database function checks your administrator role, stores only code hashes, and returns each secret code once. Do not use these test identities for real students.</p>
+    <p>Generate a small test batch using clearly labelled test identities. Each examination access code is 8 random characters. The secure database function checks your administrator role, stores only code hashes, and returns each secret code once. Do not use these test identities for real students.</p>
     <div class="notice">The 30 test codes will be created in the CHELENQO database and will expire after 365 days. Save the results securely when they appear; they cannot be retrieved from the database later.</div>
     <button type="button" class="primary" id="generateTestCodesButton">Generate 30 test codes</button>
     <p id="codeGenerationMessage" role="status" aria-live="polite"></p>
@@ -209,9 +209,10 @@ async function studentLogin(event) {
     return;
   }
 
-  const accessCode = $("studentAccessCode").value.trim();
-  if (!accessCode) {
-    showStudentMessage("Enter your school access code.");
+  const accessCode = $("studentAccessCode").value.trim().toUpperCase();
+  if (!/^[A-HJ-NP-Z2-9]{8}$/.test(accessCode)) {
+    showStudentMessage("Enter exactly 8 characters: letters A–H, J–N, P–Z and digits 2–9.");
+    $("studentAccessCode").focus();
     return;
   }
 
@@ -269,6 +270,11 @@ async function studentLogin(event) {
     button.textContent = "Verify student code";
   }
 }
+
+$("studentAccessCode").addEventListener("input", () => {
+  const field = $("studentAccessCode");
+  field.value = field.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, "").slice(0, 8);
+});
 
 $("studentLoginForm").addEventListener("submit", studentLogin);
 
