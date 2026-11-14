@@ -81,18 +81,19 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 </section>
 
 <section id="loginPanel" class="card hidden">
-<h2>Administrator Sign-in</h2>
+<h2>Teacher / Administrator Sign-in</h2>
 <form id="loginForm">
-<label for="loginEmail">Administrator email</label><input id="loginEmail" type="email" required autocomplete="username">
+<label for="loginEmail">Teacher or administrator email</label><input id="loginEmail" type="email" required autocomplete="username">
 <label for="loginPassword">Password</label><input id="loginPassword" type="password" required autocomplete="current-password">
 <button id="loginButton" class="primary">Sign in</button><p id="loginMessage" role="alert"></p>
 </form>
-<p class="muted">Only an authenticated CHELENQO administrator can use this dashboard.</p>
+<p class="muted">Only authenticated CHELENQO teachers and administrators can use this dashboard. Teachers can access only their assigned subjects.</p>
 </section>
 
 <section id="teacherPanel" class="card hidden">
 <h2>Teacher / Administrator Dashboard</h2>
 <p id="adminStatus" class="success"></p>
+<div id="adminOnlyTools">
 <h3>Generate test student access codes</h3>
 <p class="notice">Creates 30 TEST-ONLY records. Save the one-time codes securely. Do not use these identities for real students.</p>
 <button id="generateTestCodesButton" type="button" class="primary">Generate 30 test codes</button>
@@ -101,6 +102,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <textarea id="generatedCodesOutput" readonly></textarea>
 <button id="copyGeneratedCodesButton" type="button">Copy code list</button>
 <button id="downloadGeneratedCodesButton" type="button" class="secondary">Download CSV</button>
+</div>
 </div>
 <hr>
 <h3>Create an examination</h3>
@@ -142,7 +144,7 @@ const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
 });
 const panels=["studentPanel","examPanel","resultPanel","loginPanel","teacherPanel","resultsPanel"];
 let student=null, activeExam=null, questions=[], answers={}, currentQuestion=0, attemptId=null;
-let timerHandle=null, secondsLeft=0, authenticatedAdmin=false, currentSubjects=[];
+let timerHandle=null, secondsLeft=0, authenticatedAdmin=false, currentRole=null, currentSubjects=[];
 let generatedCodeRows=[];
 
 function showPanel(id){panels.forEach(p=>$(p).classList.toggle("hidden",p!==id));}
@@ -153,16 +155,17 @@ async function refreshAdmin(){
  const {data:{session}}=await db.auth.getSession();
  if(!session){setAdmin(false);return false;}
  const {data:p,error}=await db.from("profiles").select("role,school_id").eq("id",session.user.id).maybeSingle();
- const ok=!error&&p&&p.role==="admin"&&p.school_id===REQUIRED_SCHOOL_ID;
- setAdmin(!!ok,session.user.id);return !!ok;
+ const ok=!error&&p&&["admin","teacher"].includes(p.role)&&p.school_id===REQUIRED_SCHOOL_ID;
+ setAdmin(!!ok,session.user.id,ok?p.role:null);return !!ok;
 }
-function setAdmin(ok,id=null){
- authenticatedAdmin=ok;
+function setAdmin(ok,id=null,role=null){
+ authenticatedAdmin=ok;currentRole=ok?role:null;
  $("teacherTab").classList.toggle("hidden",!ok);
- $("resultsTab").classList.toggle("hidden",!ok);
+ $("resultsTab").classList.toggle("hidden",!ok||role!=="admin");
  $("signOutTab").classList.toggle("hidden",!ok);
  $("loginTab").classList.toggle("hidden",ok);
- $("adminStatus").textContent=ok?"Verified CHELENQO administrator":"";
+ $("adminOnlyTools").classList.toggle("hidden",!ok||role!=="admin");
+ $("adminStatus").textContent=!ok?"":role==="admin"?"Verified CHELENQO administrator":"Verified CHELENQO teacher — assigned subjects only";
  if(!ok&&(! $("teacherPanel").classList.contains("hidden")||!$("resultsPanel").classList.contains("hidden")))showPanel("studentPanel");
 }
 $("studentAccessCode").addEventListener("input",e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g,""));
@@ -175,7 +178,7 @@ $("studentLoginForm").addEventListener("submit",async e=>{
   const {data:{session}}=await db.auth.getSession();
   if(session){
    const {data:p}=await db.from("profiles").select("role").eq("id",session.user.id).maybeSingle();
-   if(p?.role==="admin")throw Error("Sign out of the administrator account before student login.");
+   if(p?.role==="admin"||p?.role==="teacher")throw Error("Sign out of the staff account before student login.");
   }else{
    const {error}=await db.auth.signInAnonymously();if(error)throw error;
   }
@@ -271,14 +274,28 @@ $("loginForm").addEventListener("submit",async e=>{
  e.preventDefault();$("loginButton").disabled=true;
  try{
   const {error}=await db.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value});if(error)throw error;
-  if(!await refreshAdmin()){await db.auth.signOut();throw Error("This account is not a CHELENQO administrator.");}
+  if(!await refreshAdmin()){await db.auth.signOut();throw Error("This account is not an authorized CHELENQO teacher or administrator.");}
   $("loginForm").reset();await loadSubjects();await renderExamList();showPanel("teacherPanel");
  }catch(err){message("loginMessage",err.message||"Sign-in failed.");}
  finally{$("loginButton").disabled=false;}
 });
 async function loadSubjects(){
- const {data,error}=await db.from("subjects").select("id,subject_name,grade_level").order("grade_level").order("subject_name");if(error)throw error;
- currentSubjects=data||[];fillSubjectOptions();
+ if(currentRole==="admin"){
+  const {data,error}=await db.from("subjects").select("id,subject_name,grade_level").order("grade_level").order("subject_name");if(error)throw error;
+  currentSubjects=data||[];
+ }else if(currentRole==="teacher"){
+  const {data:assignments,error}=await db.from("teacher_subject_assignments").select("subject_id");if(error)throw error;
+  const ids=(assignments||[]).map(a=>a.subject_id);
+  if(!ids.length){currentSubjects=[];}else{
+   const {data,error:subjectError}=await db.from("subjects").select("id,subject_name,grade_level").in("id",ids).order("grade_level").order("subject_name");
+   if(subjectError)throw subjectError;currentSubjects=data||[];
+  }
+ }
+ const grade=$("examGrade");grade.innerHTML='<option value="">Select grade</option>';
+ [...new Set(currentSubjects.map(s=>String(s.grade_level)))].sort().forEach(g=>{const o=document.createElement("option");o.value=g;o.textContent=g;grade.append(o);});
+ if(currentSubjects.length&&new Set(currentSubjects.map(s=>s.grade_level)).size===1){grade.value=String(currentSubjects[0].grade_level);}
+ fillSubjectOptions();
+ if(currentRole==="teacher"&&!currentSubjects.length)message("teacherMessage","No subjects have been assigned to this teacher yet.");
 }
 function fillSubjectOptions(){
  const grade=$("examGrade").value;const sel=$("examSubject");sel.innerHTML='<option value="">Select subject</option>';
@@ -288,7 +305,7 @@ $("examGrade").addEventListener("change",fillSubjectOptions);
 
 function testRows(){return Array.from({length:30},(_,i)=>({full_name:"TEST STUDENT "+String(i+1).padStart(2,"0"),grade_level:i<8?9:i<16?10:i<23?11:12,section:i%2===0?"TEST-A":"TEST-B"}));}
 $("generateTestCodesButton").addEventListener("click",async()=>{
- if(!await refreshAdmin()){message("codeGenerationMessage","Administrator sign-in required.");return;}
+ if(currentRole!=="admin"||!await refreshAdmin()){message("codeGenerationMessage","Administrator sign-in required.");return;}
  if(!confirm("Create 30 TEST-ONLY records?"))return;
  const b=$("generateTestCodesButton");b.disabled=true;
  try{
@@ -349,7 +366,7 @@ async function renderExamList(){
 async function renderResults(){
  const box=$("resultsList");box.textContent="Loading…";
  try{
-  if(!await refreshAdmin())throw Error("Administrator sign-in required.");
+  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
   const {data,error}=await db.from("exam_attempts").select("id,exam_id,student_id,score,status,submitted_at").order("submitted_at",{ascending:false}).limit(500);if(error)throw error;
   const {data:exams,error:ee}=await db.from("exams").select("id,title");if(ee)throw ee;
   const titles=Object.fromEntries((exams||[]).map(e=>[e.id,e.title]));box.innerHTML="";
