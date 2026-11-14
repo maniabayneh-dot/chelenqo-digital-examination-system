@@ -214,12 +214,19 @@ async function loadStudentExams(){
 }
 async function startExam(ex){
  try{
-  const {data:aid,error:ae}=await db.rpc("start_student_exam",{p_exam_id:ex.id});if(ae)throw ae;
+  // Load and validate questions before creating the one permitted attempt.
+  // A temporary question-loading error will not consume the student's attempt.
+  const {data:q,error:qe}=await db.from("exam_questions")
+   .select("id,question_text,options,marks,question_order")
+   .eq("exam_id",ex.id).order("question_order");
+  if(qe)throw qe;
+  if(!q?.length)throw Error("This examination has no questions.");
+
+  const {data:aid,error:ae}=await db.rpc("start_student_exam",{p_exam_id:ex.id});
+  if(ae)throw ae;
   attemptId=aid;activeExam=ex;
-  const {data:q,error:qe}=await db.from("exam_questions").select("id,question_text,options,marks,question_order").eq("exam_id",ex.id).order("question_order");
-  if(qe)throw qe;if(!q?.length)throw Error("This examination has no questions.");
   questions=q;answers={};currentQuestion=0;secondsLeft=Number(ex.duration_minutes)*60;
-  $("examStudentLabel").textContent=`${student.full_name} | Grade ${student.grade_level}`;
+  $("examStudentLabel").textContent=student.full_name+" | Grade "+student.grade_level;
   showPanel("examPanel");renderQuestion();updateTimer();clearInterval(timerHandle);
   timerHandle=setInterval(()=>{secondsLeft--;updateTimer();if(secondsLeft<=0)submitExam(true);},1000);
  }catch(err){alert(err.message||"Could not start examination.");}
