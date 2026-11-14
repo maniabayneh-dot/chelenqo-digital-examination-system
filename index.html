@@ -97,6 +97,20 @@ footer{text-align:center;padding:20px;color:#64748b}
     <p class="success"><strong>Administrator authentication is active.</strong> Access to this dashboard is checked against the Supabase profile. Database policies and server-side functions must still enforce authorization for every data operation.</p>
     <p class="notice"><strong>Live-exam warning:</strong> Exam creation, student registration, question delivery, scoring, and results are not enabled in this file. They must be connected to the reviewed Supabase tables and protected RPC functions before real examinations can be conducted.</p>
 
+    <hr>
+    <h3>Generate student access codes</h3>
+    <p>Generate a small test batch using clearly labelled test identities. The secure database function checks your administrator role, stores only code hashes, and returns each secret code once. Do not use these test identities for real students.</p>
+    <div class="notice">The 30 test codes will be created in the CHELENQO database and will expire after 365 days. Save the results securely when they appear; they cannot be retrieved from the database later.</div>
+    <button type="button" class="primary" id="generateTestCodesButton">Generate 30 test codes</button>
+    <p id="codeGenerationMessage" role="status" aria-live="polite"></p>
+    <div id="generatedCodesPanel" class="hidden">
+      <label for="generatedCodesOutput">One-time code list (copy and save securely now)</label>
+      <textarea id="generatedCodesOutput" readonly spellcheck="false" aria-label="Generated student access codes"></textarea>
+      <button type="button" id="copyGeneratedCodesButton">Copy code list</button>
+      <button type="button" class="secondary" id="downloadGeneratedCodesButton">Download CSV</button>
+      <p class="muted">This list is not saved in browser storage. Reloading or closing the page will remove it.</p>
+    </div>
+
     <h3>Create an examination</h3>
     <p>This form is retained as a design placeholder. It is disabled until a verified server-side exam-creation workflow is connected. Do not store answer keys in browser JavaScript or localStorage.</p>
     <form id="examForm">
@@ -271,6 +285,124 @@ $("studentLogoutButton").addEventListener("click", async () => {
   $("studentVerifiedPanel").classList.add("hidden");
   $("studentLoginMessage").textContent = "You have signed out.";
   $("studentLoginMessage").className = "muted";
+});
+
+function buildTestStudentRows() {
+  return Array.from({ length: 30 }, (_, index) => {
+    const grade = index < 8 ? 9 : index < 16 ? 10 : index < 23 ? 11 : 12;
+    return {
+      full_name: "TEST STUDENT " + String(index + 1).padStart(2, "0"),
+      grade_level: grade,
+      section: index % 2 === 0 ? "TEST-A" : "TEST-B"
+    };
+  });
+}
+
+let generatedCodeRows = [];
+
+function formatGeneratedCodes(rows) {
+  const header = ["Student Code", "Full Name", "Grade", "Section", "Access Code", "Expires At"];
+  const lines = [header.join("\\t")];
+  rows.forEach(row => {
+    lines.push([
+      row.student_code,
+      row.full_name,
+      row.grade_level,
+      row.section,
+      row.access_code,
+      row.expires_at
+    ].join("\\t"));
+  });
+  return lines.join("\\n");
+}
+
+$("generateTestCodesButton").addEventListener("click", async () => {
+  const button = $("generateTestCodesButton");
+  const message = $("codeGenerationMessage");
+  if (!supabaseClient) {
+    message.textContent = "Supabase connection is unavailable.";
+    message.className = "error";
+    return;
+  }
+  if (!authenticatedAdmin || !currentUserId) {
+    message.textContent = "Administrator sign-in is required. Please sign in again.";
+    message.className = "error";
+    return;
+  }
+  const verified = await refreshAdminSession();
+  if (!verified) {
+    message.textContent = "Administrator verification failed. Please sign in again.";
+    message.className = "error";
+    return;
+  }
+  if (!window.confirm("Create 30 TEST-ONLY student records in the CHELENQO database? These are not real student identities.")) {
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Generating…";
+  message.textContent = "Checking administrator authorization and generating the test batch…";
+  message.className = "muted";
+  $("generatedCodesPanel").classList.add("hidden");
+  $("generatedCodesOutput").value = "";
+  generatedCodeRows = [];
+
+  try {
+    const { data, error } = await supabaseClient.rpc(
+      "create_student_access_codes_secure",
+      { p_rows: buildTestStudentRows() }
+    );
+    if (error) throw error;
+    if (!Array.isArray(data) || data.length !== 30) {
+      throw new Error("The database did not return the expected 30 records. Check the database count before trying again.");
+    }
+    generatedCodeRows = data;
+    $("generatedCodesOutput").value = formatGeneratedCodes(data);
+    $("generatedCodesPanel").classList.remove("hidden");
+    message.textContent = "Success: 30 test codes were generated. Save the one-time list securely now.";
+    message.className = "success";
+  } catch (error) {
+    message.textContent = error.message || "Code generation failed. No codes should be assumed to have been created.";
+    message.className = "error";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Generate 30 test codes";
+  }
+});
+
+$("copyGeneratedCodesButton").addEventListener("click", async () => {
+  const output = $("generatedCodesOutput");
+  try {
+    await navigator.clipboard.writeText(output.value);
+    $("codeGenerationMessage").textContent = "Code list copied. Save it securely.";
+    $("codeGenerationMessage").className = "success";
+  } catch (error) {
+    output.focus();
+    output.select();
+    $("codeGenerationMessage").textContent = "Automatic copy was blocked. The list is selected; use your device's Copy command.";
+    $("codeGenerationMessage").className = "muted";
+  }
+});
+
+$("downloadGeneratedCodesButton").addEventListener("click", () => {
+  if (!generatedCodeRows.length) return;
+  const escapeCsv = value => '"' + String(value ?? "").replace(/"/g, '""') + '"';
+  const rows = [
+    ["Student Code", "Full Name", "Grade", "Section", "Access Code", "Expires At"],
+    ...generatedCodeRows.map(row => [
+      row.student_code, row.full_name, row.grade_level, row.section, row.access_code, row.expires_at
+    ])
+  ];
+  const csv = rows.map(row => row.map(escapeCsv).join(",")).join("\\r\\n");
+  const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "CHELENQO-TEST-STUDENT-CODES.csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 });
 
 function createClient() {
