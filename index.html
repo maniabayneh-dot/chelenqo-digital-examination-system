@@ -145,8 +145,12 @@ const TURNSTILE_SITE_KEY="0x4AAAAAAGBRdu8NmYgzAWNN";
 let studentCaptchaWidget=null,staffCaptchaWidget=null,studentCaptchaToken="",staffCaptchaToken="";
 function initTurnstile(){
  if(!window.turnstile){setTimeout(initTurnstile,250);return;}
- studentCaptchaWidget=window.turnstile.render("#studentCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>studentCaptchaToken=t,"expired-callback":()=>studentCaptchaToken="","error-callback":()=>studentCaptchaToken=""});
- staffCaptchaWidget=window.turnstile.render("#staffCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>staffCaptchaToken=t,"expired-callback":()=>staffCaptchaToken="","error-callback":()=>staffCaptchaToken=""});
+ if(!$("studentPanel").classList.contains("hidden")&&studentCaptchaWidget===null){
+  studentCaptchaWidget=window.turnstile.render("#studentCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>studentCaptchaToken=t,"expired-callback":()=>studentCaptchaToken="","error-callback":()=>studentCaptchaToken=""});
+ }
+ if(!$("loginPanel").classList.contains("hidden")&&staffCaptchaWidget===null){
+  staffCaptchaWidget=window.turnstile.render("#staffCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>staffCaptchaToken=t,"expired-callback":()=>staffCaptchaToken="","error-callback":()=>staffCaptchaToken=""});
+ }
 }
 function resetCaptcha(kind){
  if(!window.turnstile)return;
@@ -395,7 +399,7 @@ async function renderResults(){
  }catch(err){box.textContent=err.message||"Could not load results.";}
 }
 $("studentTab").addEventListener("click",()=>showPanel("studentPanel"));
-$("loginTab").addEventListener("click",()=>showPanel("loginPanel"));
+$("loginTab").addEventListener("click",()=>{showPanel("loginPanel");initTurnstile();});
 $("teacherTab").addEventListener("click",async()=>{if(await refreshAdmin()){await loadSubjects();await renderExamList();showPanel("teacherPanel");}else showPanel("loginPanel");});
 $("resultsTab").addEventListener("click",async()=>{await renderResults();showPanel("resultsPanel");});
 $("signOutTab").addEventListener("click",async()=>{await db.auth.signOut();setAdmin(false);showPanel("studentPanel");});
