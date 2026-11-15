@@ -217,8 +217,9 @@ $("studentLoginForm").addEventListener("submit",async e=>{
    if(p?.role==="admin"||p?.role==="teacher")throw Error("Sign out of the staff account before student login.");
   }else{
    if(!studentCaptchaToken)throw Error("Complete the CAPTCHA verification before continuing.");
-   const {error}=await db.auth.signInAnonymously({options:{captchaToken:studentCaptchaToken}});if(error)throw error;
+   const {error}=await db.auth.signInAnonymously({options:{captchaToken:studentCaptchaToken}});
    resetCaptcha("student");
+   if(error)throw error;
   }
   const {data,error}=await db.rpc("verify_student_access_code",{p_access_code:code});if(error)throw error;
   student=Array.isArray(data)?data[0]:data;if(!student?.student_code)throw Error("Student verification failed.");
@@ -312,8 +313,9 @@ $("loginForm").addEventListener("submit",async e=>{
  e.preventDefault();$("loginButton").disabled=true;
  try{
   if(!staffCaptchaToken)throw Error("Complete the CAPTCHA verification before staff sign-in.");
-  const {error}=await db.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value,options:{captchaToken:staffCaptchaToken}});if(error)throw error;
+  const {error}=await db.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value,options:{captchaToken:staffCaptchaToken}});
   resetCaptcha("staff");
+  if(error)throw error;
   if(!await refreshAdmin()){await db.auth.signOut();throw Error("This account is not an authorized CHELENQO teacher or administrator.");}
   $("loginForm").reset();await loadSubjects();await renderExamList();showPanel("teacherPanel");
  }catch(err){message("loginMessage",err.message||"Sign-in failed.");}
