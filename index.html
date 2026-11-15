@@ -206,29 +206,59 @@ function setAdmin(ok,id=null,role=null){
 }
 $("studentAccessCode").addEventListener("input",e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g,""));
 
+function showVerifiedStudent(data, notice="Student account recognized.") {
+ student=Array.isArray(data)?data[0]:data;
+ if(!student?.student_code)throw Error("Student verification failed.");
+ $("verifiedStudentName").textContent=student.full_name;
+ $("verifiedStudentCode").textContent=student.student_code;
+ $("verifiedStudentGrade").textContent=student.grade_level;
+ $("verifiedStudentSection").textContent=student.section;
+ $("studentLoginForm").classList.add("hidden");
+ $("studentVerifiedPanel").classList.remove("hidden");
+ message("studentLoginMessage",notice,"success");
+}
+
+async function restoreVerifiedStudentSession() {
+ const {data:{session}}=await db.auth.getSession();
+ if(!session)return false;
+ const {data:profile,error}=await db.from("profiles").select("role").eq("id",session.user.id).maybeSingle();
+ if(error)throw error;
+ if(profile?.role==="admin"||profile?.role==="teacher")return false;
+ const {data,error:verifyError}=await db.rpc("get_verified_student_profile");
+ if(verifyError)throw verifyError;
+ const row=Array.isArray(data)?data[0]:data;
+ if(!row?.student_code)return false;
+ showVerifiedStudent(row,"Welcome back. Your student account is already verified.");
+ return true;
+}
+
 $("studentLoginForm").addEventListener("submit",async e=>{
  e.preventDefault();const btn=$("studentLoginButton");btn.disabled=true;
  try{
-  const code=$("studentAccessCode").value.trim().toUpperCase();
-  if(!(/^[A-HJ-NP-Z2-9]{8}$/.test(code)||/^CHS-ACCESS-[0-9A-F]{32}$/.test(code)))throw Error("Enter a valid 8-character code.");
   const {data:{session}}=await db.auth.getSession();
   if(session){
-   const {data:p}=await db.from("profiles").select("role").eq("id",session.user.id).maybeSingle();
+   const {data:p,error:profileError}=await db.from("profiles").select("role").eq("id",session.user.id).maybeSingle();
+   if(profileError)throw profileError;
    if(p?.role==="admin"||p?.role==="teacher")throw Error("Sign out of the staff account before student login.");
-  }else{
+   const {data:existing,error:existingError}=await db.rpc("get_verified_student_profile");
+   if(existingError)throw existingError;
+   const existingStudent=Array.isArray(existing)?existing[0]:existing;
+   if(existingStudent?.student_code){
+    showVerifiedStudent(existingStudent,"Welcome back. Your student account is already verified.");
+    return;
+   }
+  }
+  const code=$("studentAccessCode").value.trim().toUpperCase();
+  if(!(/^[A-HJ-NP-Z2-9]{8}$/.test(code)||/^CHS-ACCESS-[0-9A-F]{32}$/.test(code)))throw Error("Enter a valid 8-character code.");
+  if(!session){
    if(!studentCaptchaToken)throw Error("Complete the CAPTCHA verification before continuing.");
    const {error}=await db.auth.signInAnonymously({options:{captchaToken:studentCaptchaToken}});
    resetCaptcha("student");
    if(error)throw error;
   }
-  const {data,error}=await db.rpc("verify_student_access_code",{p_access_code:code});if(error)throw error;
-  student=Array.isArray(data)?data[0]:data;if(!student?.student_code)throw Error("Student verification failed.");
-  $("verifiedStudentName").textContent=student.full_name;
-  $("verifiedStudentCode").textContent=student.student_code;
-  $("verifiedStudentGrade").textContent=student.grade_level;
-  $("verifiedStudentSection").textContent=student.section;
-  $("studentLoginForm").classList.add("hidden");$("studentVerifiedPanel").classList.remove("hidden");
-  message("studentLoginMessage","Student verified successfully.","success");
+  const {data,error}=await db.rpc("verify_student_access_code",{p_access_code:code});
+  if(error)throw error;
+  showVerifiedStudent(data,"Student verified successfully.");
  }catch(err){message("studentLoginMessage",err.message||"Verification failed.");}
  finally{btn.disabled=false;}
 });
@@ -473,8 +503,15 @@ $("loginTab").addEventListener("click",()=>{showPanel("loginPanel");initTurnstil
 $("teacherTab").addEventListener("click",async()=>{if(await refreshAdmin()){await loadSubjects();await renderExamList();showPanel("teacherPanel");}else showPanel("loginPanel");});
 $("resultsTab").addEventListener("click",async()=>{await renderResults();showPanel("resultsPanel");});
 $("signOutTab").addEventListener("click",async()=>{await db.auth.signOut();setAdmin(false);showPanel("studentPanel");});
-db.auth.onAuthStateChange(()=>{setTimeout(()=>refreshAdmin(),0);});
-setAdmin(false);showPanel("studentPanel");refreshAdmin();
+db.auth.onAuthStateChange(()=>{setTimeout(async()=>{
+ refreshAdmin();
+ try{await restoreVerifiedStudentSession();}catch(err){console.warn("Student session restore:",err.message);}
+},0);});
+setAdmin(false);showPanel("studentPanel");
+(async()=>{
+ await refreshAdmin();
+ try{await restoreVerifiedStudentSession();}catch(err){message("studentLoginMessage",err.message||"Could not restore student session.");}
+})();
 </script>
 </body>
 </html>
