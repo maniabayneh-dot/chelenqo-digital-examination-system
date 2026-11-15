@@ -26,6 +26,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 @media(max-width:520px){.card{padding:15px}button{padding:11px 12px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
 </head>
 <body>
@@ -116,7 +117,22 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <div><label for="examTitle">Examination title</label><input id="examTitle" required maxlength="200"></div>
 <div><label for="examDuration">Duration (minutes)</label><input id="examDuration" type="number" min="1" max="240" value="60" required></div>
 </div>
-<label for="questionsJson">Questions (JSON)</label>
+<h4>Choose how to add questions</h4>
+<div class="grid">
+ <div class="item">
+  <strong>Import a Microsoft Word exam</strong>
+  <p class="muted">Upload a .docx file containing numbered questions, options A–D, and an answer key. Review the extracted questions before saving.</p>
+  <label for="wordExamFile">Word document (.docx)</label>
+  <input id="wordExamFile" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+  <button id="importWordButton" type="button">Import Word questions</button>
+  <p id="wordImportMessage" role="status" class="muted"></p>
+ </div>
+ <div class="item">
+  <strong>Create questions manually</strong>
+  <p class="muted">Enter or edit the question data below. The Word importer also fills this editor so you can correct the result.</p>
+ </div>
+</div>
+<label for="questionsJson">Questions (JSON editor)</label>
 <textarea id="questionsJson" required spellcheck="false">[
   {
     "question": "Which of the following is a strong acid?",
@@ -327,6 +343,58 @@ function fillSubjectOptions(){
 }
 $("examGrade").addEventListener("change",fillSubjectOptions);
 
+
+function parseWordExamText(source){
+ const lines=source.replace(/\r/g,"").split("\n").map(x=>x.trim()).filter(Boolean);
+ const qs=[];const answerKey={};let current=null,readingAnswers=false;
+ for(const line of lines){
+  const keyMatch=line.match(/^(?:answer\s*key|answers)\s*:?\s*$/i);
+  if(keyMatch){readingAnswers=true;continue;}
+  if(readingAnswers){
+   const pairs=[...line.matchAll(/(?:^|[\s,;])(?:Q\s*)?(\d{1,3})\s*[.)\-:]?\s*([A-F])(?:\b|$)/gi)];
+   for(const m of pairs)answerKey[Number(m[1])]=m[2].toUpperCase();
+   continue;
+  }
+  const qMatch=line.match(/^(?:Q\s*)?(\d{1,3})\s*[.)]\s*(.+)$/i);
+  if(qMatch){
+   if(current)qs.push(current);
+   current={number:Number(qMatch[1]),question:qMatch[2].trim(),options:[]};continue;
+  }
+  const optMatch=line.match(/^([A-F])\s*[).:-]\s*(.+)$/i);
+  if(optMatch&&current){current.options.push({letter:optMatch[1].toUpperCase(),text:optMatch[2].trim()});continue;}
+  if(current&&!current.options.length)current.question+=" "+line;
+  else if(current&&current.options.length)current.options[current.options.length-1].text+=" "+line;
+ }
+ if(current)qs.push(current);
+ if(!qs.length)throw Error("No numbered questions found. Use format: 1. Question text, A) option, B) option, and so on.");
+ const output=qs.map(q=>{
+  const opts=q.options.sort((a,b)=>a.letter.localeCompare(b.letter));
+  if(opts.length<2)throw Error("Question "+q.number+" has fewer than two options.");
+  const correct=answerKey[q.number];
+  if(!correct)throw Error("Missing answer key entry for question "+q.number+". Add an Answer Key section such as: 1. B, 2. D.");
+  const index=opts.findIndex(o=>o.letter===correct);
+  if(index<0)throw Error("Answer "+correct+" does not match an option in question "+q.number+".");
+  return {question:q.question,options:opts.map(o=>o.text),answer:index,marks:1};
+ });
+ return output;
+}
+$("importWordButton").addEventListener("click",async()=>{
+ const file=$("wordExamFile").files?.[0];
+ try{
+  if(!file)throw Error("Choose a .docx file first.");
+  if(!file.name.toLowerCase().endsWith(".docx"))throw Error("Please upload a Microsoft Word .docx file.");
+  if(!window.mammoth)throw Error("The Word reader did not load. Refresh the page and try again.");
+  $("importWordButton").disabled=true;
+  message("wordImportMessage","Reading Word document…","muted");
+  const buffer=await file.arrayBuffer();
+  const result=await window.mammoth.extractRawText({arrayBuffer:buffer});
+  const parsed=parseWordExamText(result.value);
+  $("questionsJson").value=JSON.stringify(parsed,null,2);
+  message("wordImportMessage",parsed.length+" questions imported into the editor. Review every question and answer before creating the exam.","success");
+ }catch(err){message("wordImportMessage",err.message||"Could not import this Word document.");}
+ finally{$("importWordButton").disabled=false;}
+});
+
 function testRows(){return Array.from({length:30},(_,i)=>({full_name:"TEST STUDENT "+String(i+1).padStart(2,"0"),grade_level:i<8?9:i<16?10:i<23?11:12,section:i%2===0?"TEST-A":"TEST-B"}));}
 $("generateTestCodesButton").addEventListener("click",async()=>{
  if(currentRole!=="admin"||!await refreshAdmin()){message("codeGenerationMessage","Administrator sign-in required.");return;}
@@ -354,7 +422,7 @@ $("downloadGeneratedCodesButton").addEventListener("click",()=>{
 
 $("examForm").addEventListener("submit",async e=>{
  e.preventDefault();
- if(!await refreshAdmin()){message("teacherMessage","Administrator sign-in required.");return;}
+ if(!await refreshAdmin()||!["admin","teacher"].includes(currentRole)){message("teacherMessage","Authorized teacher or administrator sign-in required.");return;}
  let raw;
  try{raw=JSON.parse($("questionsJson").value);}catch(err){message("teacherMessage","Invalid JSON: "+err.message);return;}
  if(!Array.isArray(raw)||!raw.length){message("teacherMessage","Add at least one question.");return;}
