@@ -192,6 +192,7 @@ function resetCaptcha(kind){
 }
 document.addEventListener("DOMContentLoaded",initTurnstile);
 const $=id=>document.getElementById(id);
+$("loginTab").addEventListener("click",()=>{$("studentPanel").classList.add("hidden");$("loginPanel").classList.remove("hidden");initTurnstile();});
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
  auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
 });
@@ -594,7 +595,7 @@ async function renderResults(){
  }catch(err){box.textContent=err.message||"Could not load results.";}
 }
 $("studentTab").addEventListener("click",()=>showPanel("studentPanel"));
-$("loginTab").addEventListener("click",()=>{showPanel("loginPanel");initTurnstile();});
+// Administrator Sign-in click handler is registered before Supabase initialization above.
 $("teacherTab").addEventListener("click",async()=>{if(await refreshAdmin()){await loadSubjects();await renderExamList();showPanel("teacherPanel");}else showPanel("loginPanel");});
 $("resultsTab").addEventListener("click",async()=>{await renderResults();showPanel("resultsPanel");});
 $("signOutTab").addEventListener("click",async()=>{await db.auth.signOut();setAdmin(false);showPanel("studentPanel");});
