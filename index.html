@@ -45,20 +45,34 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <main class="container">
 <section id="studentPanel" class="card">
 <h2>CHELENQO Student Login</h2>
-<p>Enter the eight-character access code issued by the school.</p>
+<p>Use your permanent CHELENQO student ID and password. You can sign in on any school laboratory computer.</p>
 <form id="studentLoginForm">
-<label for="studentAccessCode">Student access code</label>
-<input id="studentAccessCode" maxlength="100" required autocomplete="off" autocapitalize="characters" placeholder="AB7K29PX">
+<label for="studentIdInput">Student ID</label>
+<input id="studentIdInput" maxlength="40" required autocomplete="username" autocapitalize="characters" placeholder="CHS-09-0001">
+<label for="studentPasswordInput">Password</label>
+<input id="studentPasswordInput" type="password" required autocomplete="current-password">
 <div id="studentCaptcha" class="item" aria-label="Student CAPTCHA verification"></div>
-<button id="studentLoginButton" class="primary">Verify student code</button>
+<button id="studentLoginButton" class="primary">Student sign in</button>
 <p id="studentLoginMessage" role="alert"></p>
 </form>
 <div id="studentVerifiedPanel" class="hidden success">
-<h3>Student identity verified</h3>
+<h3>Student account</h3>
 <p><b>Name:</b> <span id="verifiedStudentName"></span></p>
-<p><b>Student code:</b> <span id="verifiedStudentCode"></span></p>
+<p><b>Student ID:</b> <span id="verifiedStudentCode"></span></p>
 <p><b>Grade:</b> <span id="verifiedStudentGrade"></span></p>
 <p><b>Section:</b> <span id="verifiedStudentSection"></span></p>
+<div id="studentPasswordSetup" class="hidden item">
+<h3>Set your personal password</h3>
+<p class="notice">This is your first sign-in. Choose a new password before opening examinations. Do not share it with other students.</p>
+<form id="studentPasswordForm">
+<label for="newStudentPassword">New password (at least 10 characters)</label>
+<input id="newStudentPassword" type="password" minlength="10" required autocomplete="new-password">
+<label for="confirmStudentPassword">Confirm new password</label>
+<input id="confirmStudentPassword" type="password" minlength="10" required autocomplete="new-password">
+<button class="primary">Save my password</button>
+<p id="studentPasswordMessage" role="alert"></p>
+</form>
+</div>
 <button id="loadStudentExamsButton" type="button" class="primary">Load available examinations</button>
 <div id="studentExamList"></div>
 <button id="studentLogoutButton" type="button" class="danger">Student sign out</button>
@@ -98,14 +112,17 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <h2>Teacher / Administrator Dashboard</h2>
 <p id="adminStatus" class="success"></p>
 <div id="adminOnlyTools">
-<h3>Generate test student access codes</h3>
-<p class="notice">Creates 30 TEST-ONLY records. Save the one-time codes securely. Do not use these identities for real students.</p>
-<button id="generateTestCodesButton" type="button" class="primary">Generate 30 test codes</button>
-<p id="codeGenerationMessage" role="status"></p>
-<div id="generatedCodesPanel" class="hidden">
-<textarea id="generatedCodesOutput" readonly></textarea>
-<button id="copyGeneratedCodesButton" type="button">Copy code list</button>
-<button id="downloadGeneratedCodesButton" type="button" class="secondary">Download CSV</button>
+<h3>Create student accounts</h3>
+<p class="notice">Enter one student per line using this format: Full Name | Grade | Section. Example: Hana Bekele | 9 | A. You can create up to 100 accounts per batch.</p>
+<label for="studentBatchInput">Student list</label>
+<textarea id="studentBatchInput" placeholder="Hana Bekele | 9 | A&#10;Dawit Kebede | 10 | B"></textarea>
+<button id="createStudentAccountsButton" type="button" class="primary">Generate student IDs and temporary passwords</button>
+<p id="studentAccountsMessage" role="status"></p>
+<div id="studentAccountsPanel" class="hidden">
+<p class="notice">Temporary passwords are shown once. Download or print this list and distribute each student's credentials privately. Do not post the list publicly.</p>
+<textarea id="studentAccountsOutput" readonly></textarea>
+<button id="copyStudentAccountsButton" type="button">Copy credentials</button>
+<button id="downloadStudentAccountsButton" type="button" class="secondary">Download credentials CSV</button>
 </div>
 </div>
 <hr>
@@ -181,7 +198,7 @@ const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
 const panels=["studentPanel","examPanel","resultPanel","loginPanel","teacherPanel","resultsPanel"];
 let student=null, activeExam=null, questions=[], answers={}, currentQuestion=0, attemptId=null;
 let timerHandle=null, secondsLeft=0, authenticatedAdmin=false, currentRole=null, currentSubjects=[];
-let generatedCodeRows=[];
+let studentMustChangePassword=false, generatedStudentAccounts=[];
 
 function showPanel(id){panels.forEach(p=>$(p).classList.toggle("hidden",p!==id));}
 function message(id,text,kind="error"){$(id).textContent=text;$(id).className=kind;}
@@ -204,31 +221,42 @@ function setAdmin(ok,id=null,role=null){
  $("adminStatus").textContent=!ok?"":role==="admin"?"Verified CHELENQO administrator":"Verified CHELENQO teacher — assigned subjects only";
  if(!ok&&(! $("teacherPanel").classList.contains("hidden")||!$("resultsPanel").classList.contains("hidden")))showPanel("studentPanel");
 }
-$("studentAccessCode").addEventListener("input",e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g,""));
+$("studentIdInput").addEventListener("input",e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g,""));
 
-function showVerifiedStudent(data, notice="Student account recognized.") {
+function studentAuthEmail(studentId){
+ return studentId.toLowerCase().replaceAll("-","")+"@students.chelenqo.invalid";
+}
+
+function showVerifiedStudent(data, notice="Student account recognized.", mustChange=false) {
  student=Array.isArray(data)?data[0]:data;
- if(!student?.student_code)throw Error("Student verification failed.");
+ if(!student?.student_code)throw Error("Student account verification failed.");
+ studentMustChangePassword=!!mustChange;
  $("verifiedStudentName").textContent=student.full_name;
  $("verifiedStudentCode").textContent=student.student_code;
  $("verifiedStudentGrade").textContent=student.grade_level;
  $("verifiedStudentSection").textContent=student.section;
  $("studentLoginForm").classList.add("hidden");
  $("studentVerifiedPanel").classList.remove("hidden");
+ $("studentPasswordSetup").classList.toggle("hidden",!studentMustChangePassword);
+ $("loadStudentExamsButton").classList.toggle("hidden",studentMustChangePassword);
+ $("studentExamList").textContent="";
  message("studentLoginMessage",notice,"success");
 }
 
 async function restoreVerifiedStudentSession() {
  const {data:{session}}=await db.auth.getSession();
  if(!session)return false;
- const {data:profile,error}=await db.from("profiles").select("role").eq("id",session.user.id).maybeSingle();
+ const {data:profile,error}=await db.from("profiles")
+  .select("role,school_id,student_code,must_change_password")
+  .eq("id",session.user.id).maybeSingle();
  if(error)throw error;
  if(profile?.role==="admin"||profile?.role==="teacher")return false;
+ if(profile?.role!=="student"||profile?.school_id!=="CHELENQO"||!profile.student_code)return false;
  const {data,error:verifyError}=await db.rpc("get_verified_student_profile");
  if(verifyError)throw verifyError;
  const row=Array.isArray(data)?data[0]:data;
  if(!row?.student_code)return false;
- showVerifiedStudent(row,"Welcome back. Your student account is already verified.");
+ showVerifiedStudent(row,"Welcome back. Your student account is signed in.",profile.must_change_password);
  return true;
 }
 
@@ -237,30 +265,68 @@ $("studentLoginForm").addEventListener("submit",async e=>{
  try{
   const {data:{session}}=await db.auth.getSession();
   if(session){
-   const {data:p,error:profileError}=await db.from("profiles").select("role").eq("id",session.user.id).maybeSingle();
+   const {data:p,error:profileError}=await db.from("profiles")
+    .select("role,school_id,student_code,must_change_password")
+    .eq("id",session.user.id).maybeSingle();
    if(profileError)throw profileError;
    if(p?.role==="admin"||p?.role==="teacher")throw Error("Sign out of the staff account before student login.");
-   const {data:existing,error:existingError}=await db.rpc("get_verified_student_profile");
-   if(existingError)throw existingError;
-   const existingStudent=Array.isArray(existing)?existing[0]:existing;
-   if(existingStudent?.student_code){
-    showVerifiedStudent(existingStudent,"Welcome back. Your student account is already verified.");
-    return;
+   if(p?.role==="student"&&p.school_id==="CHELENQO"&&p.student_code){
+    const {data:existing,error:existingError}=await db.rpc("get_verified_student_profile");
+    if(existingError)throw existingError;
+    const existingStudent=Array.isArray(existing)?existing[0]:existing;
+    if(existingStudent?.student_code){
+     showVerifiedStudent(existingStudent,"This student account is already signed in.",p.must_change_password);
+     return;
+    }
    }
+   await db.auth.signOut();
   }
-  const code=$("studentAccessCode").value.trim().toUpperCase();
-  if(!(/^[A-HJ-NP-Z2-9]{8}$/.test(code)||/^CHS-ACCESS-[0-9A-F]{32}$/.test(code)))throw Error("Enter a valid 8-character code.");
-  if(!session){
-   if(!studentCaptchaToken)throw Error("Complete the CAPTCHA verification before continuing.");
-   const {error}=await db.auth.signInAnonymously({options:{captchaToken:studentCaptchaToken}});
-   resetCaptcha("student");
-   if(error)throw error;
+  const studentId=$("studentIdInput").value.trim().toUpperCase();
+  const password=$("studentPasswordInput").value;
+  if(!/^CHS-[0-9]{2}-[0-9]{4,}$/.test(studentId))throw Error("Enter the CHELENQO student ID printed on your credential slip.");
+  if(!password)throw Error("Enter your password.");
+  if(!studentCaptchaToken)throw Error("Complete the CAPTCHA verification before continuing.");
+  const {error:loginError}=await db.auth.signInWithPassword({
+   email:studentAuthEmail(studentId),
+   password,
+   options:{captchaToken:studentCaptchaToken}
+  });
+  resetCaptcha("student");
+  if(loginError)throw Error("Student ID or password is incorrect.");
+  const {data:profile,error:profileError}=await db.from("profiles")
+   .select("role,school_id,student_code,must_change_password")
+   .maybeSingle();
+  if(profileError)throw profileError;
+  if(profile?.role!=="student"||profile.school_id!=="CHELENQO"||profile.student_code!==studentId){
+   await db.auth.signOut();
+   throw Error("This login is not registered as a CHELENQO student account.");
   }
-  const {data,error}=await db.rpc("verify_student_access_code",{p_access_code:code});
+  const {data,error}=await db.rpc("get_verified_student_profile");
   if(error)throw error;
-  showVerifiedStudent(data,"Student verified successfully.");
- }catch(err){message("studentLoginMessage",err.message||"Verification failed.");}
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row?.student_code){await db.auth.signOut();throw Error("Student account is not linked to a valid CHELENQO registration.");}
+  showVerifiedStudent(row,profile.must_change_password?"First sign-in: set a personal password to continue.":"Student sign-in successful.",profile.must_change_password);
+ }catch(err){message("studentLoginMessage",err.message||"Student sign-in failed.");}
  finally{btn.disabled=false;}
+});
+
+$("studentPasswordForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const password=$("newStudentPassword").value;
+ const confirmation=$("confirmStudentPassword").value;
+ try{
+  if(password.length<10)throw Error("Choose a password with at least 10 characters.");
+  if(password!==confirmation)throw Error("The two passwords do not match.");
+  const {error:updateError}=await db.auth.updateUser({password});
+  if(updateError)throw updateError;
+  const {error:completeError}=await db.rpc("complete_student_password_setup");
+  if(completeError)throw completeError;
+  studentMustChangePassword=false;
+  $("studentPasswordForm").reset();
+  $("studentPasswordSetup").classList.add("hidden");
+  $("loadStudentExamsButton").classList.remove("hidden");
+  message("studentLoginMessage","Your personal password has been saved. You can now load your examinations.","success");
+ }catch(err){message("studentPasswordMessage",err.message||"Could not save your password.");}
 });
 
 $("loadStudentExamsButton").addEventListener("click",loadStudentExams);
@@ -427,29 +493,58 @@ $("importWordButton").addEventListener("click",async()=>{
  finally{$("importWordButton").disabled=false;}
 });
 
-function testRows(){return Array.from({length:30},(_,i)=>({full_name:"TEST STUDENT "+String(i+1).padStart(2,"0"),grade_level:i<8?9:i<16?10:i<23?11:12,section:i%2===0?"TEST-A":"TEST-B"}));}
-$("generateTestCodesButton").addEventListener("click",async()=>{
- if(currentRole!=="admin"||!await refreshAdmin()){message("codeGenerationMessage","Administrator sign-in required.");return;}
- if(!confirm("Create 30 TEST-ONLY records?"))return;
- const b=$("generateTestCodesButton");b.disabled=true;
+let generatedStudentAccounts=[];
+$("createStudentAccountsButton").addEventListener("click",async()=>{
+ const button=$("createStudentAccountsButton");
+ if(currentRole!=="admin"||!await refreshAdmin()){
+  message("studentAccountsMessage","Administrator sign-in required.");return;
+ }
+ const lines=$("studentBatchInput").value.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+ if(!lines.length){message("studentAccountsMessage","Enter at least one student.");return;}
+ if(lines.length>100){message("studentAccountsMessage","Create no more than 100 student accounts in one batch.");return;}
+ const rows=[];
+ for(let i=0;i<lines.length;i++){
+  const parts=lines[i].split("|").map(x=>x.trim());
+  if(parts.length!==3||!parts[0]||!["9","10","11","12"].includes(parts[1])||!parts[2]){
+   message("studentAccountsMessage","Line "+(i+1)+" is invalid. Use: Full Name | Grade | Section.");return;
+  }
+  rows.push({full_name:parts[0],grade_level:Number(parts[1]),section:parts[2]});
+ }
+ if(!confirm("Create "+rows.length+" CHELENQO student accounts?"))return;
+ button.disabled=true;
  try{
-  const {data,error}=await db.rpc("create_student_access_codes_secure",{p_rows:testRows()});if(error)throw error;
-  if(!Array.isArray(data)||data.length!==30)throw Error("Unexpected result count. Check database before retrying.");
-  generatedCodeRows=data;
-  $("generatedCodesOutput").value=["Student Code\tFull Name\tGrade\tSection\tAccess Code\tExpires At",...data.map(r=>[r.student_code,r.full_name,r.grade_level,r.section,r.access_code,r.expires_at].join("\t"))].join("\n");
-  $("generatedCodesPanel").classList.remove("hidden");message("codeGenerationMessage","30 test codes created. Save the list now.","success");
- }catch(err){message("codeGenerationMessage",err.message||"Generation failed.");}finally{b.disabled=false;}
+  const {data,error}=await db.functions.invoke("create-student-accounts",{body:{rows}});
+  if(error)throw error;
+  if(!data?.success||!Array.isArray(data.credentials)||data.credentials.length!==rows.length){
+   throw Error(data?.error||"Student account creation did not complete.");
+  }
+  generatedStudentAccounts=data.credentials;
+  const headers=["Student ID","Full Name","Grade","Section","Temporary Password"];
+  $("studentAccountsOutput").value=[headers.join("\\t"),...generatedStudentAccounts.map(r=>[
+   r.student_id,r.full_name,r.grade_level,r.section,r.temporary_password
+  ].map(v=>String(v).replaceAll("\\t"," ")).join("\\t"))].join("\\n");
+  $("studentAccountsPanel").classList.remove("hidden");
+  $("studentBatchInput").value="";
+  message("studentAccountsMessage",generatedStudentAccounts.length+" student accounts created. Save the credential list securely now.","success");
+ }catch(err){message("studentAccountsMessage",err.message||"Could not create student accounts.");}
+ finally{button.disabled=false;}
 });
-$("copyGeneratedCodesButton").addEventListener("click",async()=>{
- try{await navigator.clipboard.writeText($("generatedCodesOutput").value);message("codeGenerationMessage","Copied. Save the list securely.","success");}
- catch(e){$("generatedCodesOutput").select();message("codeGenerationMessage","Text selected; use Copy on your device.","muted");}
+$("copyStudentAccountsButton").addEventListener("click",async()=>{
+ try{
+  await navigator.clipboard.writeText($("studentAccountsOutput").value);
+  message("studentAccountsMessage","Credentials copied. Keep the list private and distribute each student's details separately.","success");
+ }catch(err){
+  $("studentAccountsOutput").select();
+  message("studentAccountsMessage","Credential list selected. Use Copy on your device and keep it private.","muted");
+ }
 });
-$("downloadGeneratedCodesButton").addEventListener("click",()=>{
- if(!generatedCodeRows.length)return;
- const rows=[["Student Code","Full Name","Grade","Section","Access Code","Expires At"],...generatedCodeRows.map(r=>[r.student_code,r.full_name,r.grade_level,r.section,r.access_code,r.expires_at])];
- const csv=rows.map(r=>r.map(escapeCsv).join(",")).join("\r\n");
- const url=URL.createObjectURL(new Blob(["\uFEFF",csv],{type:"text/csv;charset=utf-8"}));
- const a=document.createElement("a");a.href=url;a.download="CHELENQO-TEST-STUDENT-CODES.csv";a.click();URL.revokeObjectURL(url);
+$("downloadStudentAccountsButton").addEventListener("click",()=>{
+ if(!generatedStudentAccounts.length)return;
+ const rows=[["Student ID","Full Name","Grade","Section","Temporary Password"],
+  ...generatedStudentAccounts.map(r=>[r.student_id,r.full_name,r.grade_level,r.section,r.temporary_password])];
+ const csv=rows.map(row=>row.map(escapeCsv).join(",")).join("\\r\\n");
+ const url=URL.createObjectURL(new Blob(["\\uFEFF",csv],{type:"text/csv;charset=utf-8"}));
+ const a=document.createElement("a");a.href=url;a.download="CHELENQO-STUDENT-CREDENTIALS.csv";a.click();URL.revokeObjectURL(url);
 });
 
 $("examForm").addEventListener("submit",async e=>{
