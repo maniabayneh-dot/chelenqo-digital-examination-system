@@ -494,7 +494,6 @@ $("importWordButton").addEventListener("click",async()=>{
  finally{$("importWordButton").disabled=false;}
 });
 
-let generatedStudentAccounts=[];
 $("createStudentAccountsButton").addEventListener("click",async()=>{
  const button=$("createStudentAccountsButton");
  if(currentRole!=="admin"||!await refreshAdmin()){
