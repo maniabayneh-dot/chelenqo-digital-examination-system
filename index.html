@@ -27,6 +27,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
 </head>
 <body>
@@ -198,6 +199,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <div>
 <button id="loadFilteredResultsButton" type="button" class="primary">View Results</button>
 <button id="clearResultFiltersButton" type="button" class="secondary">Clear Filters</button>
+<button id="downloadResultsXlsxButton" type="button" class="secondary">Download Excel (.xlsx)</button>
 </div>
 <p id="resultsMessage" role="status"></p>
 <div id="resultsSummary" class="info"></div>
@@ -700,6 +702,47 @@ async function renderResults(){
 $("resultGrade").addEventListener("change",async()=>{await loadResultExams();});
 $("resultSubject").addEventListener("change",async()=>{await loadResultExams();});
 $("loadFilteredResultsButton").addEventListener("click",renderResults);
+$("downloadResultsXlsxButton").addEventListener("click",async()=>{
+ try{
+  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
+  const grade=$("resultGrade").value;
+  const section=$("resultSection").value.trim();
+  const subject=$("resultSubject").value||null;
+  const exam=$("resultExam").value||null;
+  if(!grade)throw Error("Select a grade before downloading results.");
+  if(!window.XLSX)throw Error("The Excel export library did not load. Refresh the page and try again.");
+  const {data,error}=await db.rpc("get_admin_student_results",{
+   p_grade_level:Number(grade),p_section:section||null,p_subject_id:subject,p_exam_id:exam
+  });
+  if(error)throw error;
+  const rows=(data||[]).map(r=>({
+   "Student ID":r.student_code||"",
+   "Student Name":r.full_name||"",
+   "Grade":r.grade_level??"",
+   "Section":r.section||"",
+   "Subject":r.subject_name||"",
+   "Examination":r.exam_title||"",
+   "Score":r.score??"",
+   "Total Marks":r.total_marks??"",
+   "Percentage":r.percentage==null?"":Number(r.percentage)/100,
+   "Status":r.status||"",
+   "Submitted":r.submitted_at?new Date(r.submitted_at).toLocaleString():""
+  }));
+  if(!rows.length)throw Error("No submitted or graded results match the selected filters.");
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws["!cols"]=[
+   {wch:16},{wch:26},{wch:8},{wch:12},{wch:22},{wch:32},
+   {wch:10},{wch:12},{wch:14},{wch:14},{wch:24}
+  ];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Results");
+  const gradePart="Grade-"+grade;
+  const sectionPart=section?"-Section-"+section.replace(/[^A-Za-z0-9_-]/g,"_"):"";
+  const examPart=exam?"-Exam":"-All-Exams";
+  XLSX.writeFile(wb,"CHELENQO-Results-"+gradePart+sectionPart+examPart+".xlsx");
+  message("resultsMessage",rows.length+" result(s) exported to Excel.","success");
+ }catch(err){message("resultsMessage",err.message||"Could not export results.");}
+});
 $("clearResultFiltersButton").addEventListener("click",async()=>{
  $("resultGrade").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';
  $("resultsSummary").textContent="";$("resultsList").textContent="";message("resultsMessage","Filters cleared.","muted");
