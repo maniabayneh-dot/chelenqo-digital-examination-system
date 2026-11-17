@@ -61,6 +61,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <p><b>Name:</b> <span id="verifiedStudentName"></span></p>
 <p><b>Student ID:</b> <span id="verifiedStudentCode"></span></p>
 <p><b>Grade:</b> <span id="verifiedStudentGrade"></span></p>
+<p><b>Stream:</b> <span id="verifiedStudentStream"></span></p>
 <p><b>Section:</b> <span id="verifiedStudentSection"></span></p>
 <div id="studentPasswordSetup" class="hidden item">
 <h3>Set your personal password</h3>
@@ -114,9 +115,9 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <p id="adminStatus" class="success"></p>
 <div id="adminOnlyTools">
 <h3>Create student accounts</h3>
-<p class="notice">Enter one student per line using this format: Full Name | Grade | Section. Example: Hana Bekele | 9 | A. You can create up to 100 accounts per batch.</p>
+<p class="notice">Enter one student per line using this format: Full Name | Grade | Stream | Section. For Grades 9–10 use General; for Grades 11–12 use Natural Science or Social Science. Example: Hana Bekele | 12 | Natural Science | A. You can create up to 100 accounts per batch.</p>
 <label for="studentBatchInput">Student list</label>
-<textarea id="studentBatchInput" placeholder="Hana Bekele | 9 | A&#10;Dawit Kebede | 10 | B"></textarea>
+<textarea id="studentBatchInput" placeholder="Hana Bekele | 12 | Natural Science | A&#10;Dawit Kebede | 11 | Social Science | B&#10;Abdi Ali | 9 | General | A"></textarea>
 <button id="createStudentAccountsButton" type="button" class="primary">Generate student IDs and temporary passwords</button>
 <p id="studentAccountsMessage" role="status"></p>
 <div id="studentAccountsPanel" class="hidden">
@@ -177,6 +178,15 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <option value="10">Grade 10</option>
 <option value="11">Grade 11</option>
 <option value="12">Grade 12</option>
+</select>
+</div>
+<div>
+<label for="resultStream">Stream</label>
+<select id="resultStream">
+<option value="">All streams</option>
+<option value="General">General</option>
+<option value="Natural Science">Natural Science</option>
+<option value="Social Science">Social Science</option>
 </select>
 </div>
 <div>
@@ -273,6 +283,7 @@ function showVerifiedStudent(data, notice="Student account recognized.", mustCha
  $("verifiedStudentName").textContent=student.full_name;
  $("verifiedStudentCode").textContent=student.student_code;
  $("verifiedStudentGrade").textContent=student.grade_level;
+ $("verifiedStudentStream").textContent=student.stream||"General";
  $("verifiedStudentSection").textContent=student.section;
  $("studentLoginForm").classList.add("hidden");
  $("studentVerifiedPanel").classList.remove("hidden");
@@ -286,7 +297,7 @@ async function restoreVerifiedStudentSession() {
  const {data:{session}}=await db.auth.getSession();
  if(!session)return false;
  const {data:profile,error}=await db.from("profiles")
-  .select("role,school_id,student_code,must_change_password")
+  .select("role,school_id,student_code,must_change_password,stream")
   .eq("id",session.user.id).maybeSingle();
  if(error)throw error;
  if(profile?.role==="admin"||profile?.role==="teacher")return false;
@@ -305,7 +316,7 @@ $("studentLoginForm").addEventListener("submit",async e=>{
   const {data:{session}}=await db.auth.getSession();
   if(session){
    const {data:p,error:profileError}=await db.from("profiles")
-    .select("role,school_id,student_code,must_change_password")
+    .select("role,school_id,student_code,must_change_password,stream")
     .eq("id",session.user.id).maybeSingle();
    if(profileError)throw profileError;
    if(p?.role==="admin"||p?.role==="teacher")throw Error("Sign out of the staff account before student login.");
@@ -543,10 +554,15 @@ $("createStudentAccountsButton").addEventListener("click",async()=>{
  const rows=[];
  for(let i=0;i<lines.length;i++){
   const parts=lines[i].split("|").map(x=>x.trim());
-  if(parts.length!==3||!parts[0]||!["9","10","11","12"].includes(parts[1])||!parts[2]){
-   message("studentAccountsMessage","Line "+(i+1)+" is invalid. Use: Full Name | Grade | Section.");return;
+  if(parts.length!==4||!parts[0]||!["9","10","11","12"].includes(parts[1])||!parts[2]||!parts[3]){
+   message("studentAccountsMessage","Line "+(i+1)+" is invalid. Use: Full Name | Grade | Stream | Section.");return;
   }
-  rows.push({full_name:parts[0],grade_level:Number(parts[1]),section:parts[2]});
+  const grade=Number(parts[1]);
+  const allowedStreams=grade<=10?["General"]:["Natural Science","Social Science"];
+  if(!allowedStreams.includes(parts[2])){
+   message("studentAccountsMessage","Line "+(i+1)+" has an invalid stream. Grades 9–10 use General; Grades 11–12 use Natural Science or Social Science.");return;
+  }
+  rows.push({full_name:parts[0],grade_level:grade,stream:parts[2],section:parts[3]});
  }
  if(!confirm("Create "+rows.length+" CHELENQO student accounts?"))return;
  button.disabled=true;
@@ -557,9 +573,9 @@ $("createStudentAccountsButton").addEventListener("click",async()=>{
    throw Error(data?.error||"Student account creation did not complete.");
   }
   generatedStudentAccounts=data.credentials;
-  const headers=["Student ID","Full Name","Grade","Section","Temporary Password"];
+  const headers=["Student ID","Full Name","Grade","Stream","Section","Temporary Password"];
   $("studentAccountsOutput").value=[headers.join("\\t"),...generatedStudentAccounts.map(r=>[
-   r.student_id,r.full_name,r.grade_level,r.section,r.temporary_password
+   r.student_id,r.full_name,r.grade_level,r.stream||"General",r.section,r.temporary_password
   ].map(v=>String(v).replaceAll("\\t"," ")).join("\\t"))].join("\\n");
   $("studentAccountsPanel").classList.remove("hidden");
   $("studentBatchInput").value="";
@@ -578,8 +594,8 @@ $("copyStudentAccountsButton").addEventListener("click",async()=>{
 });
 $("downloadStudentAccountsButton").addEventListener("click",()=>{
  if(!generatedStudentAccounts.length)return;
- const rows=[["Student ID","Full Name","Grade","Section","Temporary Password"],
-  ...generatedStudentAccounts.map(r=>[r.student_id,r.full_name,r.grade_level,r.section,r.temporary_password])];
+ const rows=[["Student ID","Full Name","Grade","Stream","Section","Temporary Password"],
+  ...generatedStudentAccounts.map(r=>[r.student_id,r.full_name,r.grade_level,r.stream||"General",r.section,r.temporary_password])];
  const csv=rows.map(row=>row.map(escapeCsv).join(",")).join("\\r\\n");
  const url=URL.createObjectURL(new Blob(["\\uFEFF",csv],{type:"text/csv;charset=utf-8"}));
  const a=document.createElement("a");a.href=url;a.download="CHELENQO-STUDENT-CREDENTIALS.csv";a.click();URL.revokeObjectURL(url);
@@ -657,12 +673,14 @@ async function renderResults(){
   if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
   const grade=$("resultGrade").value;
   const section=$("resultSection").value.trim();
+  const stream=$("resultStream").value||null;
   const subject=$("resultSubject").value||null;
   const exam=$("resultExam").value||null;
   if(!grade)throw Error("Select a grade.");
   const {data,error}=await db.rpc("get_admin_student_results",{
    p_grade_level:Number(grade),
    p_section:section||null,
+   p_stream:stream,
    p_subject_id:subject,
    p_exam_id:exam
   });
@@ -681,14 +699,14 @@ async function renderResults(){
   $("resultsSummary").textContent="Students/results: "+total+" | Average: "+average+" | Highest: "+highest+" | Lowest: "+lowest;
   const table=document.createElement("table");
   table.style.width="100%";table.style.borderCollapse="collapse";table.style.marginTop="14px";
-  const headers=["Student ID","Student Name","Grade","Section","Subject","Exam","Score","Total","Percentage","Status","Submitted"];
+  const headers=["Student ID","Student Name","Grade","Stream","Section","Subject","Exam","Score","Total","Percentage","Status","Submitted"];
   const thead=document.createElement("thead");const trh=document.createElement("tr");
   headers.forEach(h=>{const th=document.createElement("th");th.textContent=h;th.style.padding="8px";th.style.borderBottom="2px solid #cbd5e1";th.style.textAlign="left";trh.append(th);});
   thead.append(trh);table.append(thead);
   const tbody=document.createElement("tbody");
   rows.forEach(r=>{
    const tr=document.createElement("tr");
-   [r.student_code||"—",r.full_name||"—",r.grade_level,r.section||"—",r.subject_name||"—",r.exam_title||"—",
+   [r.student_code||"—",r.full_name||"—",r.grade_level,r.stream||"General",r.section||"—",r.subject_name||"—",r.exam_title||"—",
     r.score??"—",r.total_marks??"—",r.percentage==null?"—":r.percentage+"%",r.status,r.submitted_at?new Date(r.submitted_at).toLocaleString():"—"
    ].forEach(v=>{const td=document.createElement("td");td.textContent=String(v);td.style.padding="8px";td.style.borderBottom="1px solid #e2e8f0";tr.append(td);});
    tbody.append(tr);
@@ -719,6 +737,7 @@ $("downloadResultsXlsxButton").addEventListener("click",async()=>{
    "Student ID":r.student_code||"",
    "Student Name":r.full_name||"",
    "Grade":r.grade_level??"",
+   "Stream":r.stream||"General",
    "Section":r.section||"",
    "Subject":r.subject_name||"",
    "Examination":r.exam_title||"",
@@ -731,7 +750,7 @@ $("downloadResultsXlsxButton").addEventListener("click",async()=>{
   if(!rows.length)throw Error("No submitted or graded results match the selected filters.");
   const ws=XLSX.utils.json_to_sheet(rows);
   ws["!cols"]=[
-   {wch:16},{wch:26},{wch:8},{wch:12},{wch:22},{wch:32},
+   {wch:16},{wch:26},{wch:8},{wch:18},{wch:12},{wch:22},{wch:32},
    {wch:10},{wch:12},{wch:14},{wch:14},{wch:24}
   ];
   const wb=XLSX.utils.book_new();
@@ -744,7 +763,7 @@ $("downloadResultsXlsxButton").addEventListener("click",async()=>{
  }catch(err){message("resultsMessage",err.message||"Could not export results.");}
 });
 $("clearResultFiltersButton").addEventListener("click",async()=>{
- $("resultGrade").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';
+ $("resultGrade").value="";$("resultStream").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';
  $("resultsSummary").textContent="";$("resultsList").textContent="";message("resultsMessage","Filters cleared.","muted");
 });
 $("studentTab").addEventListener("click",()=>showPanel("studentPanel"));
