@@ -641,15 +641,25 @@ async function renderExamList(){
 async function loadResultFilterOptions(){
  try{
   if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
-  const {data:subjects,error:se}=await db.from("subjects").select("id,subject_name").order("subject_name");
-  if(se)throw se;
+  const grade=$("resultGrade").value;
+  let query=db.from("subjects")
+   .select("id,subject_name,grade_level")
+   .order("subject_name");
+  if(grade)query=query.eq("grade_level",Number(grade));
+  const {data:subjects,error}=await query;
+  if(error)throw error;
   const subjectSelect=$("resultSubject");
   subjectSelect.innerHTML='<option value="">All subjects</option>';
   (subjects||[]).forEach(s=>{
-   const o=document.createElement("option");o.value=s.id;o.textContent=s.subject_name;subjectSelect.append(o);
+   const o=document.createElement("option");
+   o.value=s.id;
+   o.textContent=s.subject_name;
+   subjectSelect.append(o);
   });
   await loadResultExams();
- }catch(err){message("resultsMessage",err.message||"Could not load result filters.");}
+ }catch(err){
+  message("resultsMessage",err.message||"Could not load result filters.");
+ }
 }
 async function loadResultExams(){
  const grade=$("resultGrade").value;
@@ -719,7 +729,10 @@ async function renderResults(){
   message("resultsMessage",err.message||"Could not load results.");
  }
 }
-$("resultGrade").addEventListener("change",async()=>{await loadResultExams();});
+$("resultGrade").addEventListener("change",async()=>{
+ $("resultSubject").value="";
+ await loadResultFilterOptions();
+});
 $("resultSubject").addEventListener("change",async()=>{await loadResultExams();});
 $("loadFilteredResultsButton").addEventListener("click",renderResults);
 $("downloadResultsXlsxButton").addEventListener("click",async()=>{
@@ -727,12 +740,17 @@ $("downloadResultsXlsxButton").addEventListener("click",async()=>{
   if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
   const grade=$("resultGrade").value;
   const section=$("resultSection").value.trim();
+  const stream=$("resultStream").value||null;
   const subject=$("resultSubject").value||null;
   const exam=$("resultExam").value||null;
   if(!grade)throw Error("Select a grade before downloading results.");
   if(!window.XLSX)throw Error("The Excel export library did not load. Refresh the page and try again.");
   const {data,error}=await db.rpc("get_admin_student_results",{
-   p_grade_level:Number(grade),p_section:section||null,p_subject_id:subject,p_exam_id:exam
+   p_grade_level:Number(grade),
+   p_section:section||null,
+   p_stream:stream,
+   p_subject_id:subject,
+   p_exam_id:exam
   });
   if(error)throw error;
   const rows=(data||[]).map(r=>({
