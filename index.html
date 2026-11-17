@@ -165,7 +165,43 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 </section>
 
 <section id="resultsPanel" class="card hidden">
-<h2>Examination Results</h2><div id="resultsList"></div>
+<h2>Student Examination Results</h2>
+<p class="muted">Administrators can filter submitted and graded results by grade and section.</p>
+<div class="grid">
+<div>
+<label for="resultGrade">Grade</label>
+<select id="resultGrade">
+<option value="">Select grade</option>
+<option value="9">Grade 9</option>
+<option value="10">Grade 10</option>
+<option value="11">Grade 11</option>
+<option value="12">Grade 12</option>
+</select>
+</div>
+<div>
+<label for="resultSection">Section</label>
+<input id="resultSection" maxlength="20" placeholder="A, B, C...">
+</div>
+<div>
+<label for="resultSubject">Subject</label>
+<select id="resultSubject">
+<option value="">All subjects</option>
+</select>
+</div>
+<div>
+<label for="resultExam">Examination</label>
+<select id="resultExam">
+<option value="">All examinations</option>
+</select>
+</div>
+</div>
+<div>
+<button id="loadFilteredResultsButton" type="button" class="primary">View Results</button>
+<button id="clearResultFiltersButton" type="button" class="secondary">Clear Filters</button>
+</div>
+<p id="resultsMessage" role="status"></p>
+<div id="resultsSummary" class="info"></div>
+<div id="resultsList"></div>
 </section>
 </main>
 <footer>&copy; 2026 Chelenqo Secondary School</footer>
@@ -582,21 +618,96 @@ async function renderExamList(){
   if(!data?.length)box.textContent="No examinations have been created.";
  }catch(err){box.textContent=err.message||"Could not load examinations.";}
 }
-async function renderResults(){
- const box=$("resultsList");box.textContent="Loading…";
+async function loadResultFilterOptions(){
  try{
   if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
-  const {data,error}=await db.from("exam_attempts").select("id,exam_id,student_id,score,status,submitted_at").order("submitted_at",{ascending:false}).limit(500);if(error)throw error;
-  const {data:exams,error:ee}=await db.from("exams").select("id,title");if(ee)throw ee;
-  const titles=Object.fromEntries((exams||[]).map(e=>[e.id,e.title]));box.innerHTML="";
-  (data||[]).forEach(r=>{const d=document.createElement("div");d.className="item";d.textContent=`${titles[r.exam_id]||"Exam"} | Student account ${r.student_id} | Score ${r.score??"—"} | ${r.status} | ${r.submitted_at||"Not submitted"}`;box.append(d);});
-  if(!data?.length)box.textContent="No attempts recorded yet.";
- }catch(err){box.textContent=err.message||"Could not load results.";}
+  const {data:subjects,error:se}=await db.from("subjects").select("id,subject_name").order("subject_name");
+  if(se)throw se;
+  const subjectSelect=$("resultSubject");
+  subjectSelect.innerHTML='<option value="">All subjects</option>';
+  (subjects||[]).forEach(s=>{
+   const o=document.createElement("option");o.value=s.id;o.textContent=s.subject_name;subjectSelect.append(o);
+  });
+  await loadResultExams();
+ }catch(err){message("resultsMessage",err.message||"Could not load result filters.");}
 }
+async function loadResultExams(){
+ const grade=$("resultGrade").value;
+ const subject=$("resultSubject").value;
+ const select=$("resultExam");
+ select.innerHTML='<option value="">All examinations</option>';
+ try{
+  let query=db.from("exams").select("id,title,grade_level,subject_id").order("created_at",{ascending:false});
+  if(grade)query=query.eq("grade_level",Number(grade));
+  if(subject)query=query.eq("subject_id",subject);
+  const {data,error}=await query;
+  if(error)throw error;
+  (data||[]).forEach(ex=>{
+   const o=document.createElement("option");o.value=ex.id;o.textContent=ex.title;select.append(o);
+  });
+ }catch(err){message("resultsMessage",err.message||"Could not load examinations.");}
+}
+async function renderResults(){
+ const box=$("resultsList");
+ box.textContent="Loading…";
+ $("resultsSummary").textContent="";
+ try{
+  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
+  const grade=$("resultGrade").value;
+  const section=$("resultSection").value.trim();
+  const subject=$("resultSubject").value||null;
+  const exam=$("resultExam").value||null;
+  if(!grade)throw Error("Select a grade.");
+  const {data,error}=await db.rpc("get_admin_student_results",{
+   p_grade_level:Number(grade),
+   p_section:section||null,
+   p_subject_id:subject,
+   p_exam_id:exam
+  });
+  if(error)throw error;
+  box.innerHTML="";
+  const rows=data||[];
+  if(!rows.length){
+   box.textContent="No submitted or graded results match the selected grade and section.";
+   return;
+  }
+  const total=rows.length;
+  const scores=rows.map(r=>Number(r.score)).filter(Number.isFinite);
+  const average=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2):"—";
+  const highest=scores.length?Math.max(...scores).toFixed(2):"—";
+  const lowest=scores.length?Math.min(...scores).toFixed(2):"—";
+  $("resultsSummary").textContent="Students/results: "+total+" | Average: "+average+" | Highest: "+highest+" | Lowest: "+lowest;
+  const table=document.createElement("table");
+  table.style.width="100%";table.style.borderCollapse="collapse";table.style.marginTop="14px";
+  const headers=["Student ID","Student Name","Grade","Section","Subject","Exam","Score","Total","Percentage","Status","Submitted"];
+  const thead=document.createElement("thead");const trh=document.createElement("tr");
+  headers.forEach(h=>{const th=document.createElement("th");th.textContent=h;th.style.padding="8px";th.style.borderBottom="2px solid #cbd5e1";th.style.textAlign="left";trh.append(th);});
+  thead.append(trh);table.append(thead);
+  const tbody=document.createElement("tbody");
+  rows.forEach(r=>{
+   const tr=document.createElement("tr");
+   [r.student_code||"—",r.full_name||"—",r.grade_level,r.section||"—",r.subject_name||"—",r.exam_title||"—",
+    r.score??"—",r.total_marks??"—",r.percentage==null?"—":r.percentage+"%",r.status,r.submitted_at?new Date(r.submitted_at).toLocaleString():"—"
+   ].forEach(v=>{const td=document.createElement("td");td.textContent=String(v);td.style.padding="8px";td.style.borderBottom="1px solid #e2e8f0";tr.append(td);});
+   tbody.append(tr);
+  });
+  table.append(tbody);box.append(table);
+ }catch(err){
+  box.textContent="";
+  message("resultsMessage",err.message||"Could not load results.");
+ }
+}
+$("resultGrade").addEventListener("change",async()=>{await loadResultExams();});
+$("resultSubject").addEventListener("change",async()=>{await loadResultExams();});
+$("loadFilteredResultsButton").addEventListener("click",renderResults);
+$("clearResultFiltersButton").addEventListener("click",async()=>{
+ $("resultGrade").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';
+ $("resultsSummary").textContent="";$("resultsList").textContent="";message("resultsMessage","Filters cleared.","muted");
+});
 $("studentTab").addEventListener("click",()=>showPanel("studentPanel"));
 // Administrator Sign-in click handler is registered before Supabase initialization above.
 $("teacherTab").addEventListener("click",async()=>{if(await refreshAdmin()){await loadSubjects();await renderExamList();showPanel("teacherPanel");}else showPanel("loginPanel");});
-$("resultsTab").addEventListener("click",async()=>{await renderResults();showPanel("resultsPanel");});
+$("resultsTab").addEventListener("click",async()=>{showPanel("resultsPanel");await loadResultFilterOptions();});
 $("signOutTab").addEventListener("click",async()=>{await db.auth.signOut();setAdmin(false);showPanel("studentPanel");});
 db.auth.onAuthStateChange(()=>{setTimeout(async()=>{
  refreshAdmin();
