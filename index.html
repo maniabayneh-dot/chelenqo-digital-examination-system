@@ -248,6 +248,7 @@ const panels=["studentPanel","examPanel","resultPanel","loginPanel","teacherPane
 let student=null, activeExam=null, questions=[], answers={}, currentQuestion=0, attemptId=null;
 let timerHandle=null, secondsLeft=0, authenticatedAdmin=false, currentRole=null, currentSubjects=[];
 let studentMustChangePassword=false, generatedStudentAccounts=[];
+let studentCurrentPassword="";
 
 function showPanel(id){panels.forEach(p=>$(p).classList.toggle("hidden",p!==id));}
 function message(id,text,kind="error"){$(id).textContent=text;$(id).className=kind;}
@@ -337,16 +338,17 @@ $("studentLoginForm").addEventListener("submit",async e=>{
   if(!/^CHS-[0-9]{2}-[0-9]{4,}$/.test(studentId))throw Error("Enter the CHELENQO student ID printed on your credential slip.");
   if(!password)throw Error("Enter your password.");
   if(!studentCaptchaToken)throw Error("Complete the CAPTCHA verification before continuing.");
-  const {error:loginError}=await db.auth.signInWithPassword({
+  const {data:loginData,error:loginError}=await db.auth.signInWithPassword({
    email:studentAuthEmail(studentId),
    password,
    options:{captchaToken:studentCaptchaToken}
   });
   resetCaptcha("student");
   if(loginError)throw Error("Student ID or password is incorrect.");
+  studentCurrentPassword=password;
   const {data:profile,error:profileError}=await db.from("profiles")
    .select("role,school_id,student_code,must_change_password,stream")
-   .eq("id",session.user.id)
+   .eq("id",loginData.session.user.id)
    .maybeSingle();
   if(profileError)throw profileError;
   if(profile?.role!=="student"||profile.school_id!=="CHELENQO"||profile.student_code!==studentId){
@@ -370,11 +372,13 @@ $("studentPasswordForm").addEventListener("submit",async e=>{
  try{
   if(password.length<8)throw Error("Choose a password with at least 8 characters.");
   if(password!==confirmation)throw Error("The two passwords do not match.");
-  const {error:updateError}=await db.auth.updateUser({password});
+  if(!studentCurrentPassword)throw Error("For security, sign out and sign in again before setting your first password.");
+  const {error:updateError}=await db.auth.updateUser({current_password:studentCurrentPassword,password});
   if(updateError)throw updateError;
   const {error:completeError}=await db.rpc("complete_student_password_setup");
   if(completeError)throw completeError;
   studentMustChangePassword=false;
+  studentCurrentPassword="";
   $("studentPasswordForm").reset();
   $("studentPasswordSetup").classList.add("hidden");
   $("loadStudentExamsButton").classList.remove("hidden");
@@ -455,7 +459,7 @@ async function submitExam(expired){
 $("returnStudent").addEventListener("click",()=>{attemptId=null;activeExam=null;$("submitBtn").disabled=false;showPanel("studentPanel");});
 $("studentLogoutButton").addEventListener("click",async()=>{
  clearInterval(timerHandle);await db.auth.signOut();student=null;
- $("studentLoginForm").reset();$("studentLoginForm").classList.remove("hidden");$("studentVerifiedPanel").classList.add("hidden");
+ studentCurrentPassword="";$("studentLoginForm").reset();$("studentLoginForm").classList.remove("hidden");$("studentVerifiedPanel").classList.add("hidden");
  $("studentExamList").innerHTML="";message("studentLoginMessage","Signed out.","muted");showPanel("studentPanel");
 });
 
