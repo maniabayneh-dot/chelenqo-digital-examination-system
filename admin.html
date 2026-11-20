@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#08675d">
+<title>CHELENQO Student Roster</title>
+<style>
+:root{--green:#08675d;--dark:#07564e;--bg:#f1f5f9;--ink:#172033;--muted:#64748b;--line:#dbe2ea;--red:#b42318}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,sans-serif}
+header{background:var(--green);color:white;padding:20px 16px;text-align:center}header h1{font-size:clamp(21px,4vw,30px);margin:0 0 7px}header p{margin:0}
+main{max-width:1100px;margin:24px auto;padding:0 14px}.card{background:white;border-radius:14px;padding:22px;box-shadow:0 4px 18px #0f172a12;margin-bottom:18px}
+h2{margin:0 0 10px;font-size:24px}.muted{color:var(--muted)}label{display:block;font-weight:600;margin:14px 0 6px}
+input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:16px;background:white}
+button,.linkbtn{display:inline-block;border:0;border-radius:8px;padding:12px 16px;background:var(--green);color:white;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none}
+button:hover,.linkbtn:hover{background:var(--dark)}button:disabled{opacity:.6;cursor:wait}.secondary{background:#475569}.danger{background:#b42318}
+.actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stats{background:#f0fdfa;border:1px solid #ccfbf1;border-radius:10px;padding:14px}.stats strong{display:block;font-size:25px}.stats span{font-size:13px;color:var(--muted)}
+.filters{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin:18px 0}
+.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:680px}th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);font-size:14px}th{background:#f8fafc;position:sticky;top:0}
+.message{min-height:22px;color:var(--red);margin:12px 0}.hidden{display:none!important}.topline{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+footer{text-align:center;color:var(--muted);padding:20px;font-size:13px}
+@media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.filters{grid-template-columns:1fr}}
+@media print{body{background:white}header{background:white;color:black;padding:8px}main{max-width:none;margin:0;padding:0}.no-print,#loginCard,footer{display:none!important}.card{box-shadow:none;padding:8px;margin:0}.tablewrap{overflow:visible}table{min-width:0}th,td{font-size:10px;padding:6px}}
+</style>
+</head>
+<body>
+<header><h1>CHELENQO SECONDARY SCHOOL</h1><p>Student Roster Management</p></header>
+<main>
+<section id="loginCard" class="card">
+  <h2>Administrator Sign In</h2>
+  <p class="muted">Sign in with your existing CHELENQO administrator email and password.</p>
+  <form id="loginForm">
+    <label for="email">Administrator email</label><input id="email" type="email" autocomplete="username" required>
+    <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+    <button id="loginButton" type="submit" style="width:100%;margin-top:18px">Sign in</button>
+  </form>
+  <p id="loginMessage" class="message" role="alert" aria-live="polite"></p>
+  <a href="index.html" class="muted">Return to student login</a>
+</section>
+
+<section id="rosterCard" class="hidden">
+  <div class="card no-print">
+    <div class="topline"><div><h2>Student Roster</h2><p id="adminName" class="muted"></p></div>
+      <div class="actions"><button id="refreshButton" type="button">Refresh</button><button id="printButton" type="button" class="secondary">Print roster</button><button id="csvButton" type="button" class="secondary">Export CSV</button><button id="signOutButton" type="button" class="danger">Sign out</button></div>
+    </div>
+    <div class="grid">
+      <div class="stats"><strong id="totalCount">0</strong><span>Total students</span></div>
+      <div class="stats"><strong id="grade9Count">0</strong><span>Grade 9</span></div>
+      <div class="stats"><strong id="grade10Count">0</strong><span>Grade 10</span></div>
+      <div class="stats"><strong id="grade11Count">0</strong><span>Grade 11</span></div>
+    </div>
+    <p class="muted" style="margin-bottom:0">Grade 12 students: <strong id="grade12Count">0</strong></p>
+    <div class="filters">
+      <div><label for="searchInput">Search name or student ID</label><input id="searchInput" type="search" placeholder="Type a name or ID"></div>
+      <div><label for="gradeFilter">Grade</label><select id="gradeFilter"><option value="">All grades</option><option>9</option><option>10</option><option>11</option><option>12</option></select></div>
+      <div><label for="sectionFilter">Section</label><select id="sectionFilter"><option value="">All sections</option></select></div>
+    </div>
+    <p id="statusMessage" class="muted" aria-live="polite">Loading roster...</p>
+  </div>
+  <div class="card">
+    <div class="topline"><h2>Registered Students</h2><span id="visibleCount" class="muted"></span></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>No.</th><th>Student ID</th><th>Full name</th><th>Grade</th><th>Section</th><th>Stream</th></tr></thead>
+      <tbody id="rosterBody"><tr><td colspan="6">Loading...</td></tr></tbody>
+    </table></div>
+  </div>
+</section>
+</main>
+<footer>© 2026 Chelenqo Secondary School</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+"use strict";
+const SUPABASE_URL="https://yqwbdpsbtugunmtbvito.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
+const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+const $=id=>document.getElementById(id);
+let allStudents=[];let visibleStudents=[];
+function showLogin(message=""){$("loginCard").classList.remove("hidden");$("rosterCard").classList.add("hidden");$("loginMessage").textContent=message}
+function showRoster(){$("loginCard").classList.add("hidden");$("rosterCard").classList.remove("hidden")}
+function safeCsv(value){let s=String(value??"");if(/^[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"'}
+async function loadRoster(){
+  $("statusMessage").textContent="Loading student records...";
+  $("refreshButton").disabled=true;
+  try{
+    const rows=[];const pageSize=500;
+    for(let start=0;start<10000;start+=pageSize){
+      const {data,error}=await client.from("profiles").select("student_code,full_name,grade_level,section,stream").eq("role","student").eq("school_id","CHELENQO").order("grade_level").order("section").order("full_name").range(start,start+pageSize-1);
+      if(error)throw error;
+      rows.push(...(data||[]));
+      if(!data||data.length<pageSize)break;
+    }
+    allStudents=rows;updateStats();updateSectionOptions();renderRoster();
+    $("statusMessage").textContent="Roster loaded successfully.";
+  }catch(error){
+    $("statusMessage").textContent="Could not load roster. Check administrator access and database policies, then try Refresh.";
+    $("rosterBody").innerHTML='<tr><td colspan="6">Roster could not be loaded.</td></tr>';
+    console.error("Roster load error:",error);
+  }finally{$("refreshButton").disabled=false}
+}
+function updateStats(){
+  $("totalCount").textContent=allStudents.length;
+  [9,10,11].forEach(g=>$("grade"+g+"Count").textContent=allStudents.filter(s=>s.grade_level===g).length);
+  $("grade12Count").textContent=allStudents.filter(s=>s.grade_level===12).length;
+}
+function updateSectionOptions(){
+  const select=$("sectionFilter");const current=select.value;
+  const sections=[...new Set(allStudents.map(s=>s.section).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  select.replaceChildren(new Option("All sections",""));
+  sections.forEach(section=>select.add(new Option(section,section)));
+  if(sections.includes(current))select.value=current;
+}
+function renderRoster(){
+  const term=$("searchInput").value.trim().toLowerCase();const grade=$("gradeFilter").value;const section=$("sectionFilter").value;
+  visibleStudents=allStudents.filter(s=>(!grade||String(s.grade_level)===grade)&&(!section||s.section===section)&&(!term||[s.student_code,s.full_name].some(v=>String(v||"").toLowerCase().includes(term))));
+  const body=$("rosterBody");body.replaceChildren();
+  $("visibleCount").textContent=visibleStudents.length+" shown";
+  if(!visibleStudents.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="No students match these filters.";tr.append(td);body.append(tr);return}
+  visibleStudents.forEach((student,index)=>{
+    const tr=document.createElement("tr");
+    [index+1,student.student_code||"—",student.full_name||"—",student.grade_level??"—",student.section||"—",student.stream||"—"].forEach(value=>{const td=document.createElement("td");td.textContent=String(value);tr.append(td)});
+    body.append(tr);
+  });
+}
+function exportCsv(){
+  const rows=[["No.","Student ID","Full name","Grade","Section","Stream"],...visibleStudents.map((s,i)=>[i+1,s.student_code,s.full_name,s.grade_level,s.section,s.stream])];
+  const csv="\uFEFF"+rows.map(row=>row.map(safeCsv).join(",")).join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download="CHELENQO_student_roster.csv";document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+async function verifyAndShow(user){
+  const {data:profile,error}=await client.from("profiles").select("full_name,role,school_id").eq("id",user.id).single();
+  if(error||!profile||profile.role!=="admin"||profile.school_id!=="CHELENQO"){
+    await client.auth.signOut();throw new Error("This page is restricted to CHELENQO administrators.");
+  }
+  $("adminName").textContent="Signed in as "+(profile.full_name||"Administrator");
+  showRoster();await loadRoster();
+}
+$("loginForm").addEventListener("submit",async event=>{
+  event.preventDefault();const button=$("loginButton");button.disabled=true;button.textContent="Signing in...";
+  try{
+    const {data,error}=await client.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+    if(error||!data.user)throw new Error("Sign-in failed. Check your email and password.");
+    await verifyAndShow(data.user);
+  }catch(error){showLogin(error.message||"Unable to sign in.");}
+  finally{button.disabled=false;button.textContent="Sign in";}
+});
+$("refreshButton").addEventListener("click",loadRoster);
+$("printButton").addEventListener("click",()=>window.print());
+$("csvButton").addEventListener("click",exportCsv);
+$("searchInput").addEventListener("input",renderRoster);
+$("gradeFilter").addEventListener("change",renderRoster);
+$("sectionFilter").addEventListener("change",renderRoster);
+$("signOutButton").addEventListener("click",async()=>{await client.auth.signOut();$("loginForm").reset();showLogin("You have signed out.");});
+(async()=>{const {data}=await client.auth.getSession();if(data.session?.user){try{await verifyAndShow(data.session.user)}catch(error){showLogin(error.message)}}})();
+</script>
+</body>
+</html>
