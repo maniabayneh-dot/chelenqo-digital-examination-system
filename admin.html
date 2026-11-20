@@ -42,7 +42,7 @@ footer{text-align:center;color:var(--muted);padding:20px;font-size:13px}
 <section id="rosterCard" class="hidden">
   <div class="card no-print">
     <div class="topline"><div><h2>Student Roster</h2><p id="adminName" class="muted"></p></div>
-      <div class="actions"><button id="refreshButton" type="button">Refresh</button><button id="printButton" type="button" class="secondary">Print roster</button><button id="csvButton" type="button" class="secondary">Export CSV</button><button id="signOutButton" type="button" class="danger">Sign out</button></div>
+      <div class="actions"><button id="refreshButton" type="button">Refresh</button><button id="printButton" type="button" class="secondary">Print roster</button><button id="csvButton" type="button" class="secondary">Export CSV</button><button id="resetPasswordButton" type="button">Reset student password</button><button id="signOutButton" type="button" class="danger">Sign out</button></div>
     </div>
     <div class="grid">
       <div class="stats"><strong id="totalCount">0</strong><span>Total students</span></div>
@@ -56,7 +56,7 @@ footer{text-align:center;color:var(--muted);padding:20px;font-size:13px}
       <div><label for="gradeFilter">Grade</label><select id="gradeFilter"><option value="">All grades</option><option>9</option><option>10</option><option>11</option><option>12</option></select></div>
       <div><label for="sectionFilter">Section</label><select id="sectionFilter"><option value="">All sections</option></select></div>
     </div>
-    <p id="statusMessage" class="muted" aria-live="polite">Loading roster...</p>
+    <p id="statusMessage" class="muted" aria-live="polite">Loading roster...</p><div id="resetPasswordCard" class="card hidden" style="margin-top:18px"><h2>Reset Student Password</h2><p class="muted">Enter the student ID. The system will generate a new temporary password. The existing password cannot be displayed.</p><label for="resetStudentId">Student ID</label><input id="resetStudentId" maxlength="40" placeholder="CHS-12-0023" autocapitalize="characters"><button id="confirmResetPasswordButton" type="button">Generate temporary password</button><p id="resetPasswordMessage" class="message" role="alert" aria-live="polite"></p><div id="temporaryPasswordResult" class="hidden" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;margin-top:12px"><strong>Temporary password</strong><p id="temporaryPasswordText" style="font-size:20px;letter-spacing:1px"></p><p id="temporaryPasswordStudent" class="muted"></p><button id="copyTemporaryPasswordButton" type="button">Copy temporary password</button><p class="muted">Give this password privately to the student. It will be shown only on this screen until you close or refresh the page.</p></div></div>
   </div>
   <div class="card">
     <div class="topline"><h2>Registered Students</h2><span id="visibleCount" class="muted"></span></div>
@@ -146,6 +146,45 @@ $("loginForm").addEventListener("submit",async event=>{
   finally{button.disabled=false;button.textContent="Sign in";}
 });
 $("refreshButton").addEventListener("click",loadRoster);
+$("resetPasswordButton").addEventListener("click",()=>{
+  const card=$("resetPasswordCard");
+  card.classList.toggle("hidden");
+  if(!card.classList.contains("hidden")) $("resetStudentId").focus();
+});
+$("confirmResetPasswordButton").addEventListener("click",async()=>{
+  const button=$("confirmResetPasswordButton");
+  const studentId=$("resetStudentId").value.trim().toUpperCase().replace(/[^A-Z0-9-]/g,"");
+  $("temporaryPasswordResult").classList.add("hidden");
+  $("resetPasswordMessage").textContent="";
+  if(!/^CHS-(09|10|11|12)-\d{4,}$/.test(studentId)){
+    $("resetPasswordMessage").textContent="Enter a valid CHELENQO student ID, for example CHS-12-0023.";
+    return;
+  }
+  button.disabled=true;button.textContent="Resetting...";
+  try{
+    const {data,error}=await client.functions.invoke("reset-student-password",{body:{student_code:studentId}});
+    if(error) throw error;
+    if(!data?.success||!data?.temporary_password) throw new Error(data?.error||"Password reset failed.");
+    $("temporaryPasswordText").textContent=data.temporary_password;
+    $("temporaryPasswordStudent").textContent=(data.student?.full_name||"Student")+" — "+(data.student?.student_id||studentId);
+    $("temporaryPasswordResult").classList.remove("hidden");
+    $("resetPasswordMessage").textContent="Password reset successfully. Give the temporary password to the student privately.";
+    $("resetPasswordMessage").style.color="#166534";
+  }catch(error){
+    $("resetPasswordMessage").textContent=error?.message||"Could not reset the student password.";
+    $("resetPasswordMessage").style.color="#b42318";
+  }finally{button.disabled=false;button.textContent="Generate temporary password";}
+});
+$("copyTemporaryPasswordButton").addEventListener("click",async()=>{
+  try{
+    await navigator.clipboard.writeText($("temporaryPasswordText").textContent);
+    $("resetPasswordMessage").textContent="Temporary password copied.";
+    $("resetPasswordMessage").style.color="#166534";
+  }catch(error){
+    $("resetPasswordMessage").textContent="Select and copy the temporary password manually.";
+  }
+});
+
 $("printButton").addEventListener("click",()=>window.print());
 $("csvButton").addEventListener("click",exportCsv);
 $("searchInput").addEventListener("input",renderRoster);
