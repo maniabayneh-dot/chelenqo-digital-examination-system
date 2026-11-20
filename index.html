@@ -345,7 +345,8 @@ $("studentLoginForm").addEventListener("submit",async e=>{
   resetCaptcha("student");
   if(loginError)throw Error("Student ID or password is incorrect.");
   const {data:profile,error:profileError}=await db.from("profiles")
-   .select("role,school_id,student_code,must_change_password")
+   .select("role,school_id,student_code,must_change_password,stream")
+   .eq("id",session.user.id)
    .maybeSingle();
   if(profileError)throw profileError;
   if(profile?.role!=="student"||profile.school_id!=="CHELENQO"||profile.student_code!==studentId){
