@@ -2,210 +2,803 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#08675d">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#123c69">
 <title>CHELENQO Digital Examination System</title>
 <style>
-:root{--green:#08675d;--green-dark:#07564e;--bg:#f1f5f9;--ink:#172033;--muted:#64748b;--line:#dbe2ea;--red:#b42318}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,sans-serif}
-header{background:var(--green);color:#fff;text-align:center;padding:26px 16px}
-header h1{font-size:clamp(23px,5vw,34px);margin:0 0 10px}
-header p{margin:0;font-size:17px}
-main{max-width:720px;margin:38px auto;padding:0 16px}
-.card{background:#fff;border-radius:16px;padding:26px;box-shadow:0 5px 22px #0f172a12}
-h2{font-size:26px;margin:0 0 10px}
-p{line-height:1.5}
-.muted{color:var(--muted)}
-label{display:block;font-weight:600;margin:18px 0 7px}
-input{width:100%;padding:15px;border:1px solid #cbd5e1;border-radius:9px;font-size:17px}
-input:focus{outline:3px solid #0d948833;border-color:var(--green)}
-button{border:0;border-radius:9px;padding:14px 18px;background:var(--green);color:white;font-size:16px;font-weight:600;cursor:pointer}
-button:hover{background:var(--green-dark)}
-button:disabled{opacity:.6;cursor:wait}
-.primary{width:100%;margin-top:22px}
-.secondary{background:#475569}
-.message{min-height:24px;margin-top:14px;color:var(--red)}
-.profile{background:#f0fdfa;border:1px solid #99f6e4;padding:15px;border-radius:10px;margin:18px 0}
-.exam{border:1px solid var(--line);border-radius:10px;padding:16px;margin:12px 0}
-.exam h3{margin:0 0 8px}
-.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-footer{text-align:center;padding:24px;color:var(--muted);font-size:13px}
-.hidden{display:none!important}
-.small{font-size:13px}
-@media(max-width:520px){main{margin:22px auto}.card{padding:20px}header{padding:22px 12px}}
+:root{--navy:#123c69;--blue:#1769aa;--green:#15803d;--red:#b91c1c;--bg:#f1f5f9;--ink:#172554}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--navy);color:white;text-align:center;padding:22px 12px}header h1{margin:5px;font-size:clamp(20px,4vw,28px)}header p{margin:6px}
+nav{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:12px;background:#e2e8f0}
+button{border:0;border-radius:7px;padding:12px 16px;background:var(--blue);color:white;font-size:15px;cursor:pointer;margin:3px}
+button:disabled{background:#94a3b8;cursor:not-allowed}button.primary{background:var(--green)}button.danger{background:var(--red)}button.secondary{background:#475569}
+.container{max-width:960px;margin:22px auto;padding:0 14px}.card{background:white;padding:20px;border-radius:12px;box-shadow:0 3px 12px #00000012;margin-bottom:18px}
+.hidden{display:none!important}label{display:block;font-weight:600;margin:12px 0 5px}
+input,select,textarea{display:block;width:100%;padding:12px;margin:6px 0 12px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;background:white}
+textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.info{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-weight:bold}
+.notice{padding:12px;border-radius:8px;background:#fff7ed;color:#9a3412;line-height:1.5}
+.success{padding:12px;border-radius:8px;background:#f0fdf4;color:#166534;line-height:1.5}
+.error{color:#b91c1c;line-height:1.5}.muted{color:#64748b;font-size:14px}.item{padding:12px;border:1px solid #e2e8f0;border-radius:8px;margin:9px 0}
+.option{display:block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:7px;padding:13px;margin:10px 0;cursor:pointer;font-weight:normal}
+.option input{display:inline-block;width:auto;margin:0 10px 0 0}#timer{font-size:20px;color:var(--red)}
+.question{font-size:19px;font-weight:bold;margin:20px 0}footer{text-align:center;padding:20px;color:#64748b}
+@media(max-width:520px){.card{padding:15px}button{padding:11px 12px}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
 </head>
 <body>
 <header>
-  <h1>CHELENQO SECONDARY SCHOOL</h1>
-  <p>Digital Examination System</p>
+<h1>CHELENQO SECONDARY SCHOOL</h1>
+<p>Digital Examination System</p>
+<p>Grades 9–12 | Student Examinations and Teacher Dashboard</p>
 </header>
-<main>
-  <section id="loginCard" class="card">
-    <h2>Student Login</h2>
-    <p class="muted">Sign in with your permanent CHELENQO Student ID and password.</p>
-    <form id="loginForm">
-      <label for="studentId">Student ID</label>
-      <input id="studentId" name="studentId" autocomplete="username" placeholder="e.g. CHS-12-0022" required>
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
-      <button id="loginButton" class="primary" type="submit">Student Sign In</button>
-    </form>
-    <p id="loginMessage" class="message" role="alert" aria-live="polite"></p>
-    <p class="muted small">If you have forgotten your password, contact the school administrator.</p>
-  </section>
+<nav>
+<button id="studentTab" type="button">Student Examination</button>
+<button id="loginTab" type="button" class="secondary">Administrator Sign-in</button>
+<button id="teacherTab" type="button" class="secondary hidden">Teacher / Admin Dashboard</button>
+<button id="resultsTab" type="button" class="secondary hidden">Results</button>
+<button id="signOutTab" type="button" class="danger hidden">Sign out</button>
+</nav>
+<main class="container">
+<section id="studentPanel" class="card">
+<h2>CHELENQO Student Login</h2>
+<p>Use your permanent CHELENQO student ID and password. You can sign in on any school laboratory computer.</p>
+<form id="studentLoginForm">
+<label for="studentIdInput">Student ID</label>
+<input id="studentIdInput" maxlength="40" required autocomplete="username" autocapitalize="characters" placeholder="CHS-09-0001">
+<label for="studentPasswordInput">Password</label>
+<input id="studentPasswordInput" type="password" required autocomplete="current-password">
+<div id="studentCaptcha" class="item" aria-label="Student CAPTCHA verification"></div>
+<button id="studentLoginButton" class="primary">Student sign in</button>
+<p id="studentLoginMessage" role="alert"></p>
+</form>
+<div id="studentVerifiedPanel" class="hidden success">
+<h3>Student account</h3>
+<p><b>Name:</b> <span id="verifiedStudentName"></span></p>
+<p><b>Student ID:</b> <span id="verifiedStudentCode"></span></p>
+<p><b>Grade:</b> <span id="verifiedStudentGrade"></span></p>
+<p><b>Stream:</b> <span id="verifiedStudentStream"></span></p>
+<p><b>Section:</b> <span id="verifiedStudentSection"></span></p>
+<div id="studentPasswordSetup" class="hidden item">
+<h3>Set your personal password</h3>
+<p class="notice">This is your first sign-in. Choose a new password before opening examinations. Do not share it with other students.</p>
+<form id="studentPasswordForm">
+<label for="newStudentPassword">New password (at least 10 characters)</label>
+<input id="newStudentPassword" type="password" minlength="10" required autocomplete="new-password">
+<label for="confirmStudentPassword">Confirm new password</label>
+<input id="confirmStudentPassword" type="password" minlength="10" required autocomplete="new-password">
+<button class="primary">Save my password</button>
+<p id="studentPasswordMessage" role="alert"></p>
+</form>
+</div>
+<button id="loadStudentExamsButton" type="button" class="primary">Load available examinations</button>
+<div id="studentExamList"></div>
+<button id="studentLogoutButton" type="button" class="danger">Student sign out</button>
+</div>
+</section>
 
-  <section id="portalCard" class="card hidden">
-    <div class="row">
-      <h2>Student Portal</h2>
-      <button id="signOutButton" class="secondary" type="button">Sign Out</button>
-    </div>
-    <div id="studentProfile" class="profile"></div>
-    <h3>Available Examinations</h3>
-    <p class="muted">Only examinations published for your grade are shown here.</p>
-    <div id="examList" aria-live="polite">Loading examinations...</div>
-    <p id="portalMessage" class="message" role="status"></p>
-  </section>
+<section id="examPanel" class="card hidden">
+<div class="info"><span id="examStudentLabel"></span><span id="timer">00:00</span></div><hr>
+<div class="info"><span id="questionNumber"></span><span id="answeredCount"></span></div>
+<p id="questionText" class="question"></p>
+<div id="options"></div><hr>
+<button id="previousBtn" type="button" class="secondary">Previous</button>
+<button id="nextBtn" type="button">Next</button>
+<button id="submitBtn" type="button" class="danger">Submit examination</button>
+<p id="examMessage" role="alert"></p>
+</section>
+
+<section id="resultPanel" class="card hidden">
+<h2>Examination Result</h2>
+<p id="resultStudent"></p><p id="resultExam"></p>
+<h3 id="resultScore"></h3><p id="resultMessage"></p>
+<button id="returnStudent" type="button" class="primary">Return to student page</button>
+</section>
+
+<section id="loginPanel" class="card hidden">
+<h2>Teacher / Administrator Sign-in</h2>
+<form id="loginForm">
+<label for="loginEmail">Teacher or administrator email</label><input id="loginEmail" type="email" required autocomplete="username">
+<label for="loginPassword">Password</label><input id="loginPassword" type="password" required autocomplete="current-password">
+<div id="staffCaptcha" class="item" aria-label="Staff CAPTCHA verification"></div>
+<button id="loginButton" class="primary">Sign in</button><p id="loginMessage" role="alert"></p>
+</form>
+<p class="muted">Only authenticated CHELENQO teachers and administrators can use this dashboard. Teachers can access only their assigned subjects.</p>
+</section>
+
+<section id="teacherPanel" class="card hidden">
+<h2>Teacher / Administrator Dashboard</h2>
+<p id="adminStatus" class="success"></p>
+<div id="adminOnlyTools">
+<h3>Create student accounts</h3>
+<p class="notice">Enter one student per line using this format: Full Name | Grade | Stream | Section. For Grades 9–10 use General; for Grades 11–12 use Natural Science or Social Science. Example: Hana Bekele | 12 | Natural Science | A. You can create up to 100 accounts per batch.</p>
+<label for="studentBatchInput">Student list</label>
+<textarea id="studentBatchInput" placeholder="Hana Bekele | 12 | Natural Science | A&#10;Dawit Kebede | 11 | Social Science | B&#10;Abdi Ali | 9 | General | A"></textarea>
+<button id="createStudentAccountsButton" type="button" class="primary">Generate student IDs and temporary passwords</button>
+<p id="studentAccountsMessage" role="status"></p>
+<div id="studentAccountsPanel" class="hidden">
+<p class="notice">Temporary passwords are shown once. Download or print this list and distribute each student's credentials privately. Do not post the list publicly.</p>
+<textarea id="studentAccountsOutput" readonly></textarea>
+<button id="copyStudentAccountsButton" type="button">Copy credentials</button>
+<button id="downloadStudentAccountsButton" type="button" class="secondary">Download credentials CSV</button>
+</div>
+</div>
+<hr>
+<h3>Create an examination</h3>
+<form id="examForm">
+<div class="grid">
+<div><label for="examGrade">Grade</label><select id="examGrade" required><option value="">Select grade</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select></div>
+<div><label for="examSubject">Subject</label><select id="examSubject" required><option value="">Select grade first</option></select></div>
+<div><label for="examTitle">Examination title</label><input id="examTitle" required maxlength="200"></div>
+<div><label for="examDuration">Duration (minutes)</label><input id="examDuration" type="number" min="1" max="240" value="60" required></div>
+</div>
+<h4>Choose how to add questions</h4>
+<div class="grid">
+ <div class="item">
+  <strong>Import a Microsoft Word exam</strong>
+  <p class="muted">Upload a .docx file containing numbered questions, options A–D, and an answer key. Review the extracted questions before saving.</p>
+  <label for="wordExamFile">Word document (.docx)</label>
+  <input id="wordExamFile" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+  <button id="importWordButton" type="button">Import Word questions</button>
+  <p id="wordImportMessage" role="status" class="muted"></p>
+ </div>
+ <div class="item">
+  <strong>Create questions manually</strong>
+  <p class="muted">Enter or edit the question data below. The Word importer also fills this editor so you can correct the result.</p>
+ </div>
+</div>
+<label for="questionsJson">Questions (JSON editor)</label>
+<textarea id="questionsJson" required spellcheck="false">[
+  {
+    "question": "Which of the following is a strong acid?",
+    "options": ["CH3COOH", "HCl", "H2CO3", "HF"],
+    "answer": 1,
+    "marks": 1
+  }
+]</textarea>
+<p class="muted">Each question needs question, options, answer (zero-based index), and optional marks.</p>
+<button class="primary">Create examination</button><p id="teacherMessage" role="status"></p>
+</form>
+<hr><h3>Examinations</h3><div id="examList"></div>
+</section>
+
+<section id="resultsPanel" class="card hidden">
+<h2>Student Examination Results</h2>
+<p class="muted">Administrators can filter submitted and graded results by grade and section.</p>
+<div class="grid">
+<div>
+<label for="resultGrade">Grade</label>
+<select id="resultGrade">
+<option value="">Select grade</option>
+<option value="9">Grade 9</option>
+<option value="10">Grade 10</option>
+<option value="11">Grade 11</option>
+<option value="12">Grade 12</option>
+</select>
+</div>
+<div>
+<label for="resultStream">Stream</label>
+<select id="resultStream">
+<option value="">All streams</option>
+<option value="General">General</option>
+<option value="Natural Science">Natural Science</option>
+<option value="Social Science">Social Science</option>
+</select>
+</div>
+<div>
+<label for="resultSection">Section</label>
+<input id="resultSection" maxlength="20" placeholder="A, B, C...">
+</div>
+<div>
+<label for="resultSubject">Subject</label>
+<select id="resultSubject">
+<option value="">All subjects</option>
+</select>
+</div>
+<div>
+<label for="resultExam">Examination</label>
+<select id="resultExam">
+<option value="">All examinations</option>
+</select>
+</div>
+</div>
+<div>
+<button id="loadFilteredResultsButton" type="button" class="primary">View Results</button>
+<button id="clearResultFiltersButton" type="button" class="secondary">Clear Filters</button>
+<button id="downloadResultsXlsxButton" type="button" class="secondary">Download Excel (.xlsx)</button>
+</div>
+<p id="resultsMessage" role="status"></p>
+<div id="resultsSummary" class="info"></div>
+<div id="resultsList"></div>
+</section>
 </main>
 <footer>&copy; 2026 Chelenqo Secondary School</footer>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
-
-const SUPABASE_URL = "https://yqwbdpsbtugunmtbvito.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
-const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+const SUPABASE_URL="https://yqwbdpsbtugunmtbvito.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
+const REQUIRED_SCHOOL_ID="CHELENQO";
+const TURNSTILE_SITE_KEY="0x4AAAAAAGBRdu8NmYgzAWNN";
+let studentCaptchaWidget=null,staffCaptchaWidget=null,studentCaptchaToken="",staffCaptchaToken="";
+function initTurnstile(){
+ if(!window.turnstile){setTimeout(initTurnstile,250);return;}
+ if(!$("studentPanel").classList.contains("hidden")&&studentCaptchaWidget===null){
+  studentCaptchaWidget=window.turnstile.render("#studentCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>studentCaptchaToken=t,"expired-callback":()=>studentCaptchaToken="","error-callback":()=>studentCaptchaToken=""});
+ }
+ if(!$("loginPanel").classList.contains("hidden")&&staffCaptchaWidget===null){
+  staffCaptchaWidget=window.turnstile.render("#staffCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>staffCaptchaToken=t,"expired-callback":()=>staffCaptchaToken="","error-callback":()=>staffCaptchaToken=""});
+ }
+}
+function resetCaptcha(kind){
+ if(!window.turnstile)return;
+ if(kind==="student"){studentCaptchaToken="";if(studentCaptchaWidget!==null)window.turnstile.reset(studentCaptchaWidget);}
+ else{staffCaptchaToken="";if(staffCaptchaWidget!==null)window.turnstile.reset(staffCaptchaWidget);}
+}
+document.addEventListener("DOMContentLoaded",initTurnstile);
+const $=id=>document.getElementById(id);
+$("loginTab").addEventListener("click",()=>{$("studentPanel").classList.add("hidden");$("loginPanel").classList.remove("hidden");initTurnstile();});
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+ auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
 });
+const panels=["studentPanel","examPanel","resultPanel","loginPanel","teacherPanel","resultsPanel"];
+let student=null, activeExam=null, questions=[], answers={}, currentQuestion=0, attemptId=null;
+let timerHandle=null, secondsLeft=0, authenticatedAdmin=false, currentRole=null, currentSubjects=[];
+let studentMustChangePassword=false, generatedStudentAccounts=[];
 
-const $ = id => document.getElementById(id);
+function showPanel(id){panels.forEach(p=>$(p).classList.toggle("hidden",p!==id));}
+function message(id,text,kind="error"){$(id).textContent=text;$(id).className=kind;}
+function escapeCsv(v){return '"'+String(v??"").replace(/"/g,'""')+'"';}
 
-function studentAuthEmail(studentId) {
-  // Must match the account format used by the secure create-student-accounts Edge Function.
-  return studentId.trim().toLowerCase().replaceAll("-", "") + "@students.chelenqo.invalid";
+async function refreshAdmin(){
+ const {data:{session}}=await db.auth.getSession();
+ if(!session){setAdmin(false);return false;}
+ const {data:p,error}=await db.from("profiles").select("role,school_id").eq("id",session.user.id).maybeSingle();
+ const ok=!error&&p&&["admin","teacher"].includes(p.role)&&p.school_id===REQUIRED_SCHOOL_ID;
+ setAdmin(!!ok,session.user.id,ok?p.role:null);return !!ok;
+}
+function setAdmin(ok,id=null,role=null){
+ authenticatedAdmin=ok;currentRole=ok?role:null;
+ $("teacherTab").classList.toggle("hidden",!ok);
+ $("resultsTab").classList.toggle("hidden",!ok||role!=="admin");
+ $("signOutTab").classList.toggle("hidden",!ok);
+ $("loginTab").classList.toggle("hidden",ok);
+ $("adminOnlyTools").classList.toggle("hidden",!ok||role!=="admin");
+ $("adminStatus").textContent=!ok?"":role==="admin"?"Verified CHELENQO administrator":"Verified CHELENQO teacher — assigned subjects only";
+ if(!ok&&(! $("teacherPanel").classList.contains("hidden")||!$("resultsPanel").classList.contains("hidden")))showPanel("studentPanel");
+}
+$("studentIdInput").addEventListener("input",e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g,""));
+
+function studentAuthEmail(studentId){
+ return studentId.toLowerCase().replaceAll("-","")+"@students.chelenqo.invalid";
 }
 
-function showLogin(message = "") {
-  $("loginCard").classList.remove("hidden");
-  $("portalCard").classList.add("hidden");
-  $("loginMessage").textContent = message;
+function showVerifiedStudent(data, notice="Student account recognized.", mustChange=false) {
+ student=Array.isArray(data)?data[0]:data;
+ if(!student?.student_code)throw Error("Student account verification failed.");
+ studentMustChangePassword=!!mustChange;
+ $("verifiedStudentName").textContent=student.full_name;
+ $("verifiedStudentCode").textContent=student.student_code;
+ $("verifiedStudentGrade").textContent=student.grade_level;
+ $("verifiedStudentStream").textContent=student.stream||"General";
+ $("verifiedStudentSection").textContent=student.section;
+ $("studentLoginForm").classList.add("hidden");
+ $("studentVerifiedPanel").classList.remove("hidden");
+ $("studentPasswordSetup").classList.toggle("hidden",!studentMustChangePassword);
+ $("loadStudentExamsButton").classList.toggle("hidden",studentMustChangePassword);
+ $("studentExamList").textContent="";
+ message("studentLoginMessage",notice,"success");
 }
 
-function showPortal() {
-  $("loginCard").classList.add("hidden");
-  $("portalCard").classList.remove("hidden");
+async function restoreVerifiedStudentSession() {
+ const {data:{session}}=await db.auth.getSession();
+ if(!session)return false;
+ const {data:profile,error}=await db.from("profiles")
+  .select("role,school_id,student_code,must_change_password,stream")
+  .eq("id",session.user.id).maybeSingle();
+ if(error)throw error;
+ if(profile?.role==="admin"||profile?.role==="teacher")return false;
+ if(profile?.role!=="student"||profile?.school_id!=="CHELENQO"||!profile.student_code)return false;
+ const {data,error:verifyError}=await db.rpc("get_verified_student_profile");
+ if(verifyError)throw verifyError;
+ const row=Array.isArray(data)?data[0]:data;
+ if(!row?.student_code)return false;
+ row.stream=profile.stream||"General";
+ showVerifiedStudent(row,"Welcome back. Your student account is signed in.",profile.must_change_password);
+ return true;
 }
 
-async function loadStudentPortal(user) {
-  const { data: profile, error } = await client
-    .from("profiles")
-    .select("full_name, school_id, grade_level, section, role, student_code, must_change_password")
-    .eq("id", user.id)
-    .single();
-
-  if (error) throw new Error("We could not load your student profile. Please contact the school administrator.");
-  if (!profile || profile.role !== "student" || profile.school_id !== "CHELENQO" || !profile.student_code) {
-    await client.auth.signOut();
-    throw new Error("This account is not registered as a CHELENQO student.");
-  }
-
-  $("studentProfile").textContent =
-    profile.full_name + " | Student ID: " + profile.student_code +
-    " | Grade " + profile.grade_level + " | Section " + profile.section;
-
-  if (profile.must_change_password) {
-    $("portalMessage").textContent =
-      "This account was issued a temporary password. Please contact the school administrator to arrange a password change.";
-  } else {
-    $("portalMessage").textContent = "";
-  }
-
-  await loadPublishedExams(profile.grade_level);
-  showPortal();
-}
-
-async function loadPublishedExams(gradeLevel) {
-  const box = $("examList");
-  box.textContent = "Loading examinations...";
-
-  const { data, error } = await client
-    .from("exams")
-    .select("id, title, grade_level, duration_minutes, total_marks, created_at, subjects(subject_name)")
-    .eq("is_published", true)
-    .eq("grade_level", gradeLevel)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    box.textContent = "Unable to load examinations. Please try again or contact the school administrator.";
-    return;
-  }
-  if (!data || data.length === 0) {
-    box.textContent = "There are no published examinations for your grade at the moment.";
-    return;
-  }
-
-  box.replaceChildren();
-  data.forEach(exam => {
-    const item = document.createElement("article");
-    item.className = "exam";
-    const title = document.createElement("h3");
-    title.textContent = exam.title;
-    const details = document.createElement("p");
-    details.className = "muted";
-    const subject = exam.subjects && exam.subjects.subject_name ? exam.subjects.subject_name : "Subject";
-    details.textContent = subject + " | Grade " + exam.grade_level + " | " +
-      exam.duration_minutes + " minutes | " + exam.total_marks + " marks";
-    item.append(title, details);
-    box.appendChild(item);
-  });
-}
-
-$("loginForm").addEventListener("submit", async event => {
-  event.preventDefault();
-  const studentId = $("studentId").value.trim();
-  const password = $("password").value;
-  const button = $("loginButton");
-  if (!studentId || !password) return;
-
-  button.disabled = true;
-  button.textContent = "Signing in...";
-  $("loginMessage").textContent = "";
-
-  try {
-    const { data, error } = await client.auth.signInWithPassword({
-      email: studentAuthEmail(studentId),
-      password
-    });
-    if (error || !data.user) throw new Error("Incorrect Student ID or password. Please check your details.");
-    await loadStudentPortal(data.user);
-  } catch (error) {
-    $("loginMessage").textContent = error.message || "Sign-in failed. Please try again.";
-    if (!document.hidden) $("portalCard").classList.add("hidden");
-    $("loginCard").classList.remove("hidden");
-  } finally {
-    button.disabled = false;
-    button.textContent = "Student Sign In";
-  }
-});
-
-$("signOutButton").addEventListener("click", async () => {
-  await client.auth.signOut();
-  $("loginForm").reset();
-  showLogin("You have signed out.");
-});
-
-(async function restoreSession() {
-  const { data } = await client.auth.getSession();
-  if (data.session?.user) {
-    try {
-      await loadStudentPortal(data.session.user);
-    } catch (error) {
-      await client.auth.signOut();
-      showLogin(error.message);
+$("studentLoginForm").addEventListener("submit",async e=>{
+ e.preventDefault();const btn=$("studentLoginButton");btn.disabled=true;
+ try{
+  const {data:{session}}=await db.auth.getSession();
+  if(session){
+   const {data:p,error:profileError}=await db.from("profiles")
+    .select("role,school_id,student_code,must_change_password,stream")
+    .eq("id",session.user.id).maybeSingle();
+   if(profileError)throw profileError;
+   if(p?.role==="admin"||p?.role==="teacher")throw Error("Sign out of the staff account before student login.");
+   if(p?.role==="student"&&p.school_id==="CHELENQO"&&p.student_code){
+    const {data:existing,error:existingError}=await db.rpc("get_verified_student_profile");
+    if(existingError)throw existingError;
+    const existingStudent=Array.isArray(existing)?existing[0]:existing;
+    if(existingStudent?.student_code){
+     showVerifiedStudent(existingStudent,"This student account is already signed in.",p.must_change_password);
+     return;
     }
+   }
+   await db.auth.signOut();
   }
+  const studentId=$("studentIdInput").value.trim().toUpperCase();
+  const password=$("studentPasswordInput").value;
+  if(!/^CHS-[0-9]{2}-[0-9]{4,}$/.test(studentId))throw Error("Enter the CHELENQO student ID printed on your credential slip.");
+  if(!password)throw Error("Enter your password.");
+  if(!studentCaptchaToken)throw Error("Complete the CAPTCHA verification before continuing.");
+  const {error:loginError}=await db.auth.signInWithPassword({
+   email:studentAuthEmail(studentId),
+   password,
+   options:{captchaToken:studentCaptchaToken}
+  });
+  resetCaptcha("student");
+  if(loginError)throw Error("Student ID or password is incorrect.");
+  const {data:profile,error:profileError}=await db.from("profiles")
+   .select("role,school_id,student_code,must_change_password")
+   .maybeSingle();
+  if(profileError)throw profileError;
+  if(profile?.role!=="student"||profile.school_id!=="CHELENQO"||profile.student_code!==studentId){
+   await db.auth.signOut();
+   throw Error("This login is not registered as a CHELENQO student account.");
+  }
+  const {data,error}=await db.rpc("get_verified_student_profile");
+  if(error)throw error;
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row?.student_code){await db.auth.signOut();throw Error("Student account is not linked to a valid CHELENQO registration.");}
+  row.stream=profile.stream||"General";
+  showVerifiedStudent(row,profile.must_change_password?"First sign-in: set a personal password to continue.":"Student sign-in successful.",profile.must_change_password);
+ }catch(err){message("studentLoginMessage",err.message||"Student sign-in failed.");}
+ finally{btn.disabled=false;}
+});
+
+$("studentPasswordForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const password=$("newStudentPassword").value;
+ const confirmation=$("confirmStudentPassword").value;
+ try{
+  if(password.length<10)throw Error("Choose a password with at least 10 characters.");
+  if(password!==confirmation)throw Error("The two passwords do not match.");
+  const {error:updateError}=await db.auth.updateUser({password});
+  if(updateError)throw updateError;
+  const {error:completeError}=await db.rpc("complete_student_password_setup");
+  if(completeError)throw completeError;
+  studentMustChangePassword=false;
+  $("studentPasswordForm").reset();
+  $("studentPasswordSetup").classList.add("hidden");
+  $("loadStudentExamsButton").classList.remove("hidden");
+  message("studentLoginMessage","Your personal password has been saved. You can now load your examinations.","success");
+ }catch(err){message("studentPasswordMessage",err.message||"Could not save your password.");}
+});
+
+$("loadStudentExamsButton").addEventListener("click",loadStudentExams);
+async function loadStudentExams(){
+ const box=$("studentExamList");box.textContent="Loading examinations…";
+ try{
+  const {data,error}=await db.from("exams").select("id,title,grade_level,duration_minutes,total_marks,subject_id")
+   .eq("is_published",true).eq("grade_level",Number(student.grade_level)).order("created_at",{ascending:false});
+  if(error)throw error;
+  if(!data?.length){box.textContent="No published examinations are available for your grade.";return;}
+  const ids=[...new Set(data.map(x=>x.subject_id).filter(Boolean))];
+  const {data:subs,error:se}=await db.from("subjects").select("id,subject_name").in("id",ids);if(se)throw se;
+  const names=Object.fromEntries((subs||[]).map(s=>[s.id,s.subject_name]));
+  box.innerHTML="";
+  data.forEach(ex=>{
+   const item=document.createElement("div");item.className="item";
+   const title=document.createElement("strong");title.textContent=(names[ex.subject_id]||"Subject")+" — "+ex.title;
+   const details=document.createElement("p");details.className="muted";details.textContent=`${ex.duration_minutes} minutes | ${ex.total_marks} marks`;
+   const start=document.createElement("button");start.type="button";start.className="primary";start.textContent="Start examination";
+   start.addEventListener("click",()=>startExam(ex));item.append(title,details,start);box.append(item);
+  });
+ }catch(err){box.textContent=err.message||"Could not load examinations.";}
+}
+async function startExam(ex){
+ try{
+  // Load and validate questions before creating the one permitted attempt.
+  // A temporary question-loading error will not consume the student's attempt.
+  const {data:q,error:qe}=await db.from("exam_questions")
+   .select("id,question_text,options,marks,question_order")
+   .eq("exam_id",ex.id).order("question_order");
+  if(qe)throw qe;
+  if(!q?.length)throw Error("This examination has no questions.");
+
+  const {data:aid,error:ae}=await db.rpc("start_student_exam",{p_exam_id:ex.id});
+  if(ae)throw ae;
+  attemptId=aid;activeExam=ex;
+  questions=q;answers={};currentQuestion=0;secondsLeft=Number(ex.duration_minutes)*60;
+  $("examStudentLabel").textContent=student.full_name+" | Grade "+student.grade_level;
+  showPanel("examPanel");renderQuestion();updateTimer();clearInterval(timerHandle);
+  timerHandle=setInterval(()=>{secondsLeft--;updateTimer();if(secondsLeft<=0)submitExam(true);},1000);
+ }catch(err){alert(err.message||"Could not start examination.");}
+}
+function updateTimer(){const m=Math.floor(secondsLeft/60),s=secondsLeft%60;$("timer").textContent=String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");}
+function renderQuestion(){
+ const q=questions[currentQuestion];$("questionNumber").textContent=`Question ${currentQuestion+1} of ${questions.length}`;
+ $("answeredCount").textContent=`Answered: ${Object.keys(answers).length}`;$("questionText").textContent=q.question_text;
+ const box=$("options");box.innerHTML="";
+ q.options.forEach((opt,i)=>{
+  const label=document.createElement("label");label.className="option";
+  const radio=document.createElement("input");radio.type="radio";radio.name="answer";radio.checked=answers[q.id]===String.fromCharCode(65+i);
+  radio.addEventListener("change",()=>{answers[q.id]=String.fromCharCode(65+i);renderQuestion();});
+  label.append(radio,document.createTextNode(`${String.fromCharCode(65+i)}. ${opt}`));box.append(label);
+ });
+ $("previousBtn").disabled=currentQuestion===0;$("nextBtn").disabled=currentQuestion===questions.length-1;
+}
+$("previousBtn").addEventListener("click",()=>{if(currentQuestion>0){currentQuestion--;renderQuestion();}});
+$("nextBtn").addEventListener("click",()=>{if(currentQuestion<questions.length-1){currentQuestion++;renderQuestion();}});
+$("submitBtn").addEventListener("click",()=>submitExam(false));
+async function submitExam(expired){
+ if(!attemptId||!activeExam)return;
+ if(!expired&&!confirm("Submit your examination now? You cannot try again."))return;
+ $("submitBtn").disabled=true;clearInterval(timerHandle);message("examMessage","Submitting answers…","muted");
+ try{
+  const {data:score,error}=await db.rpc("submit_exam_answers",{p_attempt_id:attemptId,p_answers:answers});if(error)throw error;
+  $("resultStudent").textContent=`Student: ${student.full_name} | ${student.student_code}`;
+  $("resultExam").textContent=activeExam.title;
+  $("resultScore").textContent=`Score: ${score} / ${activeExam.total_marks}`;
+  $("resultMessage").textContent=expired?"Time expired. The answers received by the server were submitted.":"Your examination was submitted and graded by the database.";
+  showPanel("resultPanel");
+ }catch(err){message("examMessage",err.message||"Submission failed. Keep this page open and try again.");$("submitBtn").disabled=false;}
+}
+$("returnStudent").addEventListener("click",()=>{attemptId=null;activeExam=null;$("submitBtn").disabled=false;showPanel("studentPanel");});
+$("studentLogoutButton").addEventListener("click",async()=>{
+ clearInterval(timerHandle);await db.auth.signOut();student=null;
+ $("studentLoginForm").reset();$("studentLoginForm").classList.remove("hidden");$("studentVerifiedPanel").classList.add("hidden");
+ $("studentExamList").innerHTML="";message("studentLoginMessage","Signed out.","muted");showPanel("studentPanel");
+});
+
+$("loginForm").addEventListener("submit",async e=>{
+ e.preventDefault();$("loginButton").disabled=true;
+ try{
+  if(!staffCaptchaToken)throw Error("Complete the CAPTCHA verification before staff sign-in.");
+  const {error}=await db.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value,options:{captchaToken:staffCaptchaToken}});
+  resetCaptcha("staff");
+  if(error)throw error;
+  if(!await refreshAdmin()){await db.auth.signOut();throw Error("This account is not an authorized CHELENQO teacher or administrator.");}
+  $("loginForm").reset();await loadSubjects();await renderExamList();showPanel("teacherPanel");
+ }catch(err){message("loginMessage",err.message||"Sign-in failed.");}
+ finally{$("loginButton").disabled=false;}
+});
+async function loadSubjects(){
+ if(currentRole==="admin"){
+  const {data,error}=await db.from("subjects").select("id,subject_name,grade_level").order("grade_level").order("subject_name");if(error)throw error;
+  currentSubjects=data||[];
+ }else if(currentRole==="teacher"){
+  const {data:assignments,error}=await db.from("teacher_subject_assignments").select("subject_id");if(error)throw error;
+  const ids=(assignments||[]).map(a=>a.subject_id);
+  if(!ids.length){currentSubjects=[];}else{
+   const {data,error:subjectError}=await db.from("subjects").select("id,subject_name,grade_level").in("id",ids).order("grade_level").order("subject_name");
+   if(subjectError)throw subjectError;currentSubjects=data||[];
+  }
+ }
+ const grade=$("examGrade");grade.innerHTML='<option value="">Select grade</option>';
+ [...new Set(currentSubjects.map(s=>String(s.grade_level)))].sort().forEach(g=>{const o=document.createElement("option");o.value=g;o.textContent=g;grade.append(o);});
+ if(currentSubjects.length&&new Set(currentSubjects.map(s=>s.grade_level)).size===1){grade.value=String(currentSubjects[0].grade_level);}
+ fillSubjectOptions();
+ if(currentRole==="teacher"&&!currentSubjects.length)message("teacherMessage","No subjects have been assigned to this teacher yet.");
+}
+function fillSubjectOptions(){
+ const grade=$("examGrade").value;const sel=$("examSubject");sel.innerHTML='<option value="">Select subject</option>';
+ currentSubjects.filter(s=>String(s.grade_level)===grade).forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=s.subject_name;sel.append(o);});
+}
+$("examGrade").addEventListener("change",fillSubjectOptions);
+
+
+function parseWordExamText(source){
+ const lines=source.replace(/\r/g,"").split("\n").map(x=>x.trim()).filter(Boolean);
+ const qs=[];const answerKey={};let current=null,readingAnswers=false;
+ for(const line of lines){
+  const keyMatch=line.match(/^(?:answer\s*key|answers)\s*:?\s*$/i);
+  if(keyMatch){readingAnswers=true;continue;}
+  if(readingAnswers){
+   const pairs=[...line.matchAll(/(?:^|[\s,;])(?:Q\s*)?(\d{1,3})\s*[.)\-:]?\s*([A-F])(?:\b|$)/gi)];
+   for(const m of pairs)answerKey[Number(m[1])]=m[2].toUpperCase();
+   continue;
+  }
+  const qMatch=line.match(/^(?:Q\s*)?(\d{1,3})\s*[.)]\s*(.+)$/i);
+  if(qMatch){
+   if(current)qs.push(current);
+   current={number:Number(qMatch[1]),question:qMatch[2].trim(),options:[]};continue;
+  }
+  const optMatch=line.match(/^([A-F])\s*[).:-]\s*(.+)$/i);
+  if(optMatch&&current){current.options.push({letter:optMatch[1].toUpperCase(),text:optMatch[2].trim()});continue;}
+  if(current&&!current.options.length)current.question+=" "+line;
+  else if(current&&current.options.length)current.options[current.options.length-1].text+=" "+line;
+ }
+ if(current)qs.push(current);
+ if(!qs.length)throw Error("No numbered questions found. Use format: 1. Question text, A) option, B) option, and so on.");
+ const output=qs.map(q=>{
+  const opts=q.options.sort((a,b)=>a.letter.localeCompare(b.letter));
+  if(opts.length<2)throw Error("Question "+q.number+" has fewer than two options.");
+  const correct=answerKey[q.number];
+  if(!correct)throw Error("Missing answer key entry for question "+q.number+". Add an Answer Key section such as: 1. B, 2. D.");
+  const index=opts.findIndex(o=>o.letter===correct);
+  if(index<0)throw Error("Answer "+correct+" does not match an option in question "+q.number+".");
+  return {question:q.question,options:opts.map(o=>o.text),answer:index,marks:1};
+ });
+ return output;
+}
+$("importWordButton").addEventListener("click",async()=>{
+ const file=$("wordExamFile").files?.[0];
+ try{
+  if(!file)throw Error("Choose a .docx file first.");
+  if(!file.name.toLowerCase().endsWith(".docx"))throw Error("Please upload a Microsoft Word .docx file.");
+  if(!window.mammoth)throw Error("The Word reader did not load. Refresh the page and try again.");
+  $("importWordButton").disabled=true;
+  message("wordImportMessage","Reading Word document…","muted");
+  const buffer=await file.arrayBuffer();
+  const result=await window.mammoth.extractRawText({arrayBuffer:buffer});
+  const parsed=parseWordExamText(result.value);
+  $("questionsJson").value=JSON.stringify(parsed,null,2);
+  message("wordImportMessage",parsed.length+" questions imported into the editor. Review every question and answer before creating the exam.","success");
+ }catch(err){message("wordImportMessage",err.message||"Could not import this Word document.");}
+ finally{$("importWordButton").disabled=false;}
+});
+
+$("createStudentAccountsButton").addEventListener("click",async()=>{
+ const button=$("createStudentAccountsButton");
+ if(currentRole!=="admin"||!await refreshAdmin()){
+  message("studentAccountsMessage","Administrator sign-in required.");return;
+ }
+ const lines=$("studentBatchInput").value.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+ if(!lines.length){message("studentAccountsMessage","Enter at least one student.");return;}
+ if(lines.length>100){message("studentAccountsMessage","Create no more than 100 student accounts in one batch.");return;}
+ const rows=[];
+ for(let i=0;i<lines.length;i++){
+  const parts=lines[i].split("|").map(x=>x.trim());
+  if(parts.length!==4||!parts[0]||!["9","10","11","12"].includes(parts[1])||!parts[2]||!parts[3]){
+   message("studentAccountsMessage","Line "+(i+1)+" is invalid. Use: Full Name | Grade | Stream | Section.");return;
+  }
+  const grade=Number(parts[1]);
+  const allowedStreams=grade<=10?["General"]:["Natural Science","Social Science"];
+  if(!allowedStreams.includes(parts[2])){
+   message("studentAccountsMessage","Line "+(i+1)+" has an invalid stream. Grades 9–10 use General; Grades 11–12 use Natural Science or Social Science.");return;
+  }
+  rows.push({full_name:parts[0],grade_level:grade,stream:parts[2],section:parts[3]});
+ }
+ if(!confirm("Create "+rows.length+" CHELENQO student accounts?"))return;
+ button.disabled=true;
+ try{
+  const {data,error}=await db.functions.invoke("create-student-accounts",{body:{rows}});
+  if(error)throw error;
+  if(!data?.success||!Array.isArray(data.credentials)||data.credentials.length!==rows.length){
+   throw Error(data?.error||"Student account creation did not complete.");
+  }
+  generatedStudentAccounts=data.credentials;
+  const headers=["Student ID","Full Name","Grade","Stream","Section","Temporary Password"];
+  $("studentAccountsOutput").value=[headers.join("\\t"),...generatedStudentAccounts.map(r=>[
+   r.student_id,r.full_name,r.grade_level,r.stream||"General",r.section,r.temporary_password
+  ].map(v=>String(v).replaceAll("\\t"," ")).join("\\t"))].join("\\n");
+  $("studentAccountsPanel").classList.remove("hidden");
+  $("studentBatchInput").value="";
+  message("studentAccountsMessage",generatedStudentAccounts.length+" student accounts created. Save the credential list securely now.","success");
+ }catch(err){message("studentAccountsMessage",err.message||"Could not create student accounts.");}
+ finally{button.disabled=false;}
+});
+$("copyStudentAccountsButton").addEventListener("click",async()=>{
+ try{
+  await navigator.clipboard.writeText($("studentAccountsOutput").value);
+  message("studentAccountsMessage","Credentials copied. Keep the list private and distribute each student's details separately.","success");
+ }catch(err){
+  $("studentAccountsOutput").select();
+  message("studentAccountsMessage","Credential list selected. Use Copy on your device and keep it private.","muted");
+ }
+});
+$("downloadStudentAccountsButton").addEventListener("click",()=>{
+ if(!generatedStudentAccounts.length)return;
+ const rows=[["Student ID","Full Name","Grade","Stream","Section","Temporary Password"],
+  ...generatedStudentAccounts.map(r=>[r.student_id,r.full_name,r.grade_level,r.stream||"General",r.section,r.temporary_password])];
+ const csv=rows.map(row=>row.map(escapeCsv).join(",")).join("\\r\\n");
+ const url=URL.createObjectURL(new Blob(["\\uFEFF",csv],{type:"text/csv;charset=utf-8"}));
+ const a=document.createElement("a");a.href=url;a.download="CHELENQO-STUDENT-CREDENTIALS.csv";a.click();URL.revokeObjectURL(url);
+});
+
+$("examForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ if(!await refreshAdmin()||!["admin","teacher"].includes(currentRole)){message("teacherMessage","Authorized teacher or administrator sign-in required.");return;}
+ let raw;
+ try{raw=JSON.parse($("questionsJson").value);}catch(err){message("teacherMessage","Invalid JSON: "+err.message);return;}
+ if(!Array.isArray(raw)||!raw.length){message("teacherMessage","Add at least one question.");return;}
+ const valid=raw.every(q=>q&&typeof q.question==="string"&&q.question.trim()&&Array.isArray(q.options)&&q.options.length>=2&&q.options.length<=6&&q.options.every(x=>typeof x==="string"&&x.trim())&&Number.isInteger(q.answer)&&q.answer>=0&&q.answer<q.options.length);
+ if(!valid){message("teacherMessage","Each question needs text, 2–6 options and a valid zero-based answer index.");return;}
+ const payload=raw.map(q=>({question_text:q.question.trim(),options:q.options,correct_option:q.answer,marks:Number.isInteger(q.marks)&&q.marks>0?q.marks:1,explanation:q.explanation||null}));
+ try{
+  const {data:id,error}=await db.rpc("create_teacher_exam",{p_title:$("examTitle").value.trim(),p_grade_level:Number($("examGrade").value),p_subject_id:$("examSubject").value,p_duration_minutes:Number($("examDuration").value),p_questions:payload});
+  if(error)throw error;message("teacherMessage","Examination created as unpublished. Review and publish it below.","success");
+  $("examForm").reset();fillSubjectOptions();await renderExamList();
+ }catch(err){message("teacherMessage",err.message||"Exam creation failed.");}
+});
+async function renderExamList(){
+ const box=$("examList");box.textContent="Loading…";
+ try{
+  const {data,error}=await db.from("exams").select("id,title,grade_level,duration_minutes,total_marks,is_published,subject_id").order("created_at",{ascending:false});if(error)throw error;
+  const {data:subs,error:se}=await db.from("subjects").select("id,subject_name");if(se)throw se;
+  const names=Object.fromEntries((subs||[]).map(s=>[s.id,s.subject_name]));box.innerHTML="";
+  (data||[]).forEach(ex=>{
+   const item=document.createElement("div");item.className="item";
+   const title=document.createElement("strong");title.textContent=`Grade ${ex.grade_level} — ${names[ex.subject_id]||"Subject"}: ${ex.title}`;
+   const detail=document.createElement("p");detail.className="muted";detail.textContent=`${ex.duration_minutes} minutes | ${ex.total_marks} marks | ${ex.is_published?"Published":"Unpublished"}`;
+   item.append(title,detail);
+   const btn=document.createElement("button");btn.type="button";btn.className=ex.is_published?"secondary":"primary";btn.textContent=ex.is_published?"Unpublish":"Publish";
+   btn.addEventListener("click",async()=>{
+    try{const {error}=await db.rpc("publish_teacher_exam",{p_exam_id:ex.id,p_publish:!ex.is_published});if(error)throw error;await renderExamList();}
+    catch(err){alert(err.message||"Could not change publication status.");}
+   });item.append(btn);box.append(item);
+  });
+  if(!data?.length)box.textContent="No examinations have been created.";
+ }catch(err){box.textContent=err.message||"Could not load examinations.";}
+}
+async function loadResultFilterOptions(){
+ try{
+  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
+  const grade=$("resultGrade").value;
+  let query=db.from("subjects")
+   .select("id,subject_name,grade_level")
+   .order("subject_name");
+  if(grade)query=query.eq("grade_level",Number(grade));
+  const {data:subjects,error}=await query;
+  if(error)throw error;
+  const subjectSelect=$("resultSubject");
+  subjectSelect.innerHTML='<option value="">All subjects</option>';
+  (subjects||[]).forEach(s=>{
+   const o=document.createElement("option");
+   o.value=s.id;
+   o.textContent=s.subject_name;
+   subjectSelect.append(o);
+  });
+  await loadResultExams();
+ }catch(err){
+  message("resultsMessage",err.message||"Could not load result filters.");
+ }
+}
+async function loadResultExams(){
+ const grade=$("resultGrade").value;
+ const subject=$("resultSubject").value;
+ const select=$("resultExam");
+ select.innerHTML='<option value="">All examinations</option>';
+ try{
+  let query=db.from("exams").select("id,title,grade_level,subject_id").order("created_at",{ascending:false});
+  if(grade)query=query.eq("grade_level",Number(grade));
+  if(subject)query=query.eq("subject_id",subject);
+  const {data,error}=await query;
+  if(error)throw error;
+  (data||[]).forEach(ex=>{
+   const o=document.createElement("option");o.value=ex.id;o.textContent=ex.title;select.append(o);
+  });
+ }catch(err){message("resultsMessage",err.message||"Could not load examinations.");}
+}
+async function renderResults(){
+ const box=$("resultsList");
+ box.textContent="Loading…";
+ $("resultsSummary").textContent="";
+ try{
+  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
+  const grade=$("resultGrade").value;
+  const section=$("resultSection").value.trim();
+  const stream=$("resultStream").value||null;
+  const subject=$("resultSubject").value||null;
+  const exam=$("resultExam").value||null;
+  if(!grade)throw Error("Select a grade.");
+  const {data,error}=await db.rpc("get_admin_student_results",{
+   p_grade_level:Number(grade),
+   p_section:section||null,
+   p_stream:stream,
+   p_subject_id:subject,
+   p_exam_id:exam
+  });
+  if(error)throw error;
+  box.innerHTML="";
+  const rows=data||[];
+  if(!rows.length){
+   box.textContent="No submitted or graded results match the selected grade and section.";
+   return;
+  }
+  const total=rows.length;
+  const scores=rows.map(r=>Number(r.score)).filter(Number.isFinite);
+  const average=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2):"—";
+  const highest=scores.length?Math.max(...scores).toFixed(2):"—";
+  const lowest=scores.length?Math.min(...scores).toFixed(2):"—";
+  $("resultsSummary").textContent="Students/results: "+total+" | Average: "+average+" | Highest: "+highest+" | Lowest: "+lowest;
+  const table=document.createElement("table");
+  table.style.width="100%";table.style.borderCollapse="collapse";table.style.marginTop="14px";
+  const headers=["Student ID","Student Name","Grade","Stream","Section","Subject","Exam","Score","Total","Percentage","Status","Submitted"];
+  const thead=document.createElement("thead");const trh=document.createElement("tr");
+  headers.forEach(h=>{const th=document.createElement("th");th.textContent=h;th.style.padding="8px";th.style.borderBottom="2px solid #cbd5e1";th.style.textAlign="left";trh.append(th);});
+  thead.append(trh);table.append(thead);
+  const tbody=document.createElement("tbody");
+  rows.forEach(r=>{
+   const tr=document.createElement("tr");
+   [r.student_code||"—",r.full_name||"—",r.grade_level,r.stream||"General",r.section||"—",r.subject_name||"—",r.exam_title||"—",
+    r.score??"—",r.total_marks??"—",r.percentage==null?"—":r.percentage+"%",r.status,r.submitted_at?new Date(r.submitted_at).toLocaleString():"—"
+   ].forEach(v=>{const td=document.createElement("td");td.textContent=String(v);td.style.padding="8px";td.style.borderBottom="1px solid #e2e8f0";tr.append(td);});
+   tbody.append(tr);
+  });
+  table.append(tbody);box.append(table);
+ }catch(err){
+  box.textContent="";
+  message("resultsMessage",err.message||"Could not load results.");
+ }
+}
+$("resultGrade").addEventListener("change",async()=>{
+ $("resultSubject").value="";
+ await loadResultFilterOptions();
+});
+$("resultSubject").addEventListener("change",async()=>{await loadResultExams();});
+$("loadFilteredResultsButton").addEventListener("click",renderResults);
+$("downloadResultsXlsxButton").addEventListener("click",async()=>{
+ try{
+  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
+  const grade=$("resultGrade").value;
+  const section=$("resultSection").value.trim();
+  const stream=$("resultStream").value||null;
+  const subject=$("resultSubject").value||null;
+  const exam=$("resultExam").value||null;
+  if(!grade)throw Error("Select a grade before downloading results.");
+  if(!window.XLSX)throw Error("The Excel export library did not load. Refresh the page and try again.");
+  const {data,error}=await db.rpc("get_admin_student_results",{
+   p_grade_level:Number(grade),
+   p_section:section||null,
+   p_stream:stream,
+   p_subject_id:subject,
+   p_exam_id:exam
+  });
+  if(error)throw error;
+  const rows=(data||[]).map(r=>({
+   "Student ID":r.student_code||"",
+   "Student Name":r.full_name||"",
+   "Grade":r.grade_level??"",
+   "Stream":r.stream||"General",
+   "Section":r.section||"",
+   "Subject":r.subject_name||"",
+   "Examination":r.exam_title||"",
+   "Score":r.score??"",
+   "Total Marks":r.total_marks??"",
+   "Percentage":r.percentage==null?"":Number(r.percentage)/100,
+   "Status":r.status||"",
+   "Submitted":r.submitted_at?new Date(r.submitted_at).toLocaleString():""
+  }));
+  if(!rows.length)throw Error("No submitted or graded results match the selected filters.");
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws["!cols"]=[
+   {wch:16},{wch:26},{wch:8},{wch:18},{wch:12},{wch:22},{wch:32},
+   {wch:10},{wch:12},{wch:14},{wch:14},{wch:24}
+  ];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Results");
+  const gradePart="Grade-"+grade;
+  const sectionPart=section?"-Section-"+section.replace(/[^A-Za-z0-9_-]/g,"_"):"";
+  const examPart=exam?"-Exam":"-All-Exams";
+  XLSX.writeFile(wb,"CHELENQO-Results-"+gradePart+sectionPart+examPart+".xlsx");
+  message("resultsMessage",rows.length+" result(s) exported to Excel.","success");
+ }catch(err){message("resultsMessage",err.message||"Could not export results.");}
+});
+$("clearResultFiltersButton").addEventListener("click",async()=>{
+ $("resultGrade").value="";$("resultStream").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';
+ $("resultsSummary").textContent="";$("resultsList").textContent="";message("resultsMessage","Filters cleared.","muted");
+});
+$("studentTab").addEventListener("click",()=>showPanel("studentPanel"));
+// Administrator Sign-in click handler is registered before Supabase initialization above.
+$("teacherTab").addEventListener("click",async()=>{if(await refreshAdmin()){await loadSubjects();await renderExamList();showPanel("teacherPanel");}else showPanel("loginPanel");});
+$("resultsTab").addEventListener("click",async()=>{showPanel("resultsPanel");await loadResultFilterOptions();});
+$("signOutTab").addEventListener("click",async()=>{await db.auth.signOut();setAdmin(false);showPanel("studentPanel");});
+db.auth.onAuthStateChange(()=>{setTimeout(async()=>{
+ refreshAdmin();
+ try{await restoreVerifiedStudentSession();}catch(err){console.warn("Student session restore:",err.message);}
+},0);});
+setAdmin(false);showPanel("studentPanel");
+(async()=>{
+ await refreshAdmin();
+ try{await restoreVerifiedStudentSession();}catch(err){message("studentLoginMessage",err.message||"Could not restore student session.");}
 })();
 </script>
 </body>
