@@ -115,8 +115,15 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <p id="adminStatus" class="success"></p>
 <div id="adminOnlyTools">
 <h3>Create student accounts</h3>
-<p class="notice">Enter one student per line using this format: Full Name | Grade | Stream | Section. For Grades 9–10 use General; for Grades 11–12 use Natural Science or Social Science. Example: Hana Bekele | 12 | Natural Science | A. You can create up to 100 accounts per batch.</p>
-<label for="studentBatchInput">Student list</label>
+<p class="notice">Upload an Excel workbook (.xlsx or .xls) with columns: Student Name, Grade, Section, Stream. Grades 9–10 use General; Grades 11–12 use Natural Science or Social Science. You can upload up to 100 students per batch.</p>
+<div class="item">
+ <label for="studentExcelFile">Student Excel file</label>
+ <input id="studentExcelFile" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+ <button id="importStudentExcelButton" type="button">Import student Excel file</button>
+ <button id="downloadStudentTemplateButton" type="button" class="secondary">Download Excel template</button>
+ <p id="studentExcelMessage" role="status" class="muted"></p>
+</div>
+<label for="studentBatchInput">Student list (review before creating accounts)</label>
 <textarea id="studentBatchInput" placeholder="Hana Bekele | 12 | Natural Science | A&#10;Dawit Kebede | 11 | Social Science | B&#10;Abdi Ali | 9 | General | A"></textarea>
 <button id="createStudentAccountsButton" type="button" class="primary">Generate student IDs and temporary passwords</button>
 <p id="studentAccountsMessage" role="status"></p>
@@ -124,7 +131,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <p class="notice">Temporary passwords are shown once. Download or print this list and distribute each student's credentials privately. Do not post the list publicly.</p>
 <textarea id="studentAccountsOutput" readonly></textarea>
 <button id="copyStudentAccountsButton" type="button">Copy credentials</button>
-<button id="downloadStudentAccountsButton" type="button" class="secondary">Download credentials CSV</button>
+<button id="downloadStudentAccountsButton" type="button" class="secondary">Download credentials Excel</button>
 </div>
 </div>
 <hr>
@@ -551,6 +558,44 @@ $("importWordButton").addEventListener("click",async()=>{
  finally{$("importWordButton").disabled=false;}
 });
 
+$("downloadStudentTemplateButton").addEventListener("click",()=>{
+ if(!window.XLSX){message("studentExcelMessage","Excel library did not load. Refresh the page and try again.");return;}
+ const rows=[{"Student Name":"Hana Bekele","Grade":12,"Section":"A","Stream":"Natural Science"},{"Student Name":"Abdi Mohammed","Grade":9,"Section":"B","Stream":"General"}];
+ const ws=XLSX.utils.json_to_sheet(rows,{header:["Student Name","Grade","Section","Stream"]});
+ ws["!cols"]=[{wch:26},{wch:10},{wch:12},{wch:20}];
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Students");
+ XLSX.writeFile(wb,"CHELENQO-STUDENT-TEMPLATE.xlsx");
+});
+$("importStudentExcelButton").addEventListener("click",async()=>{
+ const file=$("studentExcelFile").files?.[0];
+ try{
+  if(!file)throw Error("Choose an Excel file first.");
+  if(!/\\.xlsx?$/i.test(file.name))throw Error("Please choose an .xlsx or .xls Excel file.");
+  if(!window.XLSX)throw Error("Excel reader did not load. Refresh the page and try again.");
+  $("importStudentExcelButton").disabled=true;
+  message("studentExcelMessage","Reading Excel workbook…","muted");
+  const bytes=await file.arrayBuffer();
+  const workbook=XLSX.read(bytes,{type:"array"});
+  const sheet=workbook.Sheets[workbook.SheetNames[0]];
+  if(!sheet)throw Error("The workbook has no worksheet.");
+  const data=XLSX.utils.sheet_to_json(sheet,{defval:"",raw:false});
+  if(!data.length)throw Error("The first worksheet contains no student rows.");
+  if(data.length>100)throw Error("Upload no more than 100 students at a time.");
+  const normalize=v=>String(v??"").trim().toLowerCase().replace(/[ _-]+/g,"");
+  const rows=data.map((r,index)=>{
+   const cells={};for(const [k,v] of Object.entries(r))cells[normalize(k)]=String(v??"").trim();
+   const name=cells.studentname||cells.fullname||cells.name;
+   const grade=cells.grade||cells.gradelevel;
+   const section=cells.section;
+   const stream=cells.stream;
+   if(!name||!grade||!section||!stream)throw Error("Row "+(index+2)+" must contain Student Name, Grade, Section and Stream.");
+   return {name,grade:String(Number(grade)),section,stream};
+  });
+  $("studentBatchInput").value=rows.map(r=>[r.name,r.grade,r.stream,r.section].join(" | ")).join("\\n");
+  message("studentExcelMessage",rows.length+" student row(s) imported. Review the list below, then select Generate student IDs and temporary passwords.","success");
+ }catch(err){message("studentExcelMessage",err.message||"Could not import the Excel file.");}
+ finally{$("importStudentExcelButton").disabled=false;}
+});
 $("createStudentAccountsButton").addEventListener("click",async()=>{
  const button=$("createStudentAccountsButton");
  if(currentRole!=="admin"||!await refreshAdmin()){
@@ -602,11 +647,15 @@ $("copyStudentAccountsButton").addEventListener("click",async()=>{
 });
 $("downloadStudentAccountsButton").addEventListener("click",()=>{
  if(!generatedStudentAccounts.length)return;
- const rows=[["Student ID","Full Name","Grade","Stream","Section","Temporary Password"],
-  ...generatedStudentAccounts.map(r=>[r.student_id,r.full_name,r.grade_level,r.stream||"General",r.section,r.temporary_password])];
- const csv=rows.map(row=>row.map(escapeCsv).join(",")).join("\\r\\n");
- const url=URL.createObjectURL(new Blob(["\\uFEFF",csv],{type:"text/csv;charset=utf-8"}));
- const a=document.createElement("a");a.href=url;a.download="CHELENQO-STUDENT-CREDENTIALS.csv";a.click();URL.revokeObjectURL(url);
+ if(!window.XLSX){message("studentAccountsMessage","Excel library did not load. Copy the credentials list instead.");return;}
+ const rows=generatedStudentAccounts.map(r=>({
+  "Student ID":r.student_id,"Student Name":r.full_name,"Grade":r.grade_level,
+  "Section":r.section,"Stream":r.stream||"General","Temporary Password":r.temporary_password
+ }));
+ const ws=XLSX.utils.json_to_sheet(rows);
+ ws["!cols"]=[{wch:18},{wch:26},{wch:10},{wch:12},{wch:20},{wch:22}];
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Student Credentials");
+ XLSX.writeFile(wb,"CHELENQO-STUDENT-CREDENTIALS.xlsx");
 });
 
 $("examForm").addEventListener("submit",async e=>{
