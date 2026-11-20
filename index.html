@@ -174,8 +174,8 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 </section>
 
 <section id="resultsPanel" class="card hidden">
-<h2>Student Examination Results</h2>
-<p class="muted">Administrators can filter submitted and graded results by grade and section.</p>
+<h2>Student Result Roster</h2>
+<p class="muted">Generate a class roster with rank, every available subject, total, average, percentage and status. Grades 11–12 remain separated by Natural Science and Social Science.</p>
 <div class="grid">
 <div>
 <label for="resultGrade">Grade</label>
@@ -201,7 +201,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <input id="resultSection" maxlength="20" placeholder="A, B, C...">
 </div>
 <div>
-<label for="resultSubject">Subject</label>
+<label for="resultSubject">Subject filter</label>
 <select id="resultSubject">
 <option value="">All subjects</option>
 </select>
@@ -214,8 +214,9 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 </div>
 </div>
 <div>
-<button id="loadFilteredResultsButton" type="button" class="primary">View Results</button>
+<button id="loadFilteredResultsButton" type="button" class="primary">Generate Result Roster</button>
 <button id="clearResultFiltersButton" type="button" class="secondary">Clear Filters</button>
+<button id="printResultsButton" type="button" class="secondary">Print Roster</button>
 <button id="downloadResultsXlsxButton" type="button" class="secondary">Download Excel (.xlsx)</button>
 </div>
 <p id="resultsMessage" role="status"></p>
@@ -732,110 +733,119 @@ async function loadResultExams(){
   });
  }catch(err){message("resultsMessage",err.message||"Could not load examinations.");}
 }
-async function renderResults(){
- const box=$("resultsList");
- box.textContent="Loading…";
- $("resultsSummary").textContent="";
- try{
-  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
-  const grade=$("resultGrade").value;
-  const section=$("resultSection").value.trim();
-  const stream=$("resultStream").value||null;
-  const subject=$("resultSubject").value||null;
-  const exam=$("resultExam").value||null;
-  if(!grade)throw Error("Select a grade.");
-  const {data,error}=await db.rpc("get_admin_student_results",{
-   p_grade_level:Number(grade),
-   p_section:section||null,
-   p_stream:stream,
-   p_subject_id:subject,
-   p_exam_id:exam
+function buildResultRoster(rows){
+ const subjectMap=new Map();
+ const students=new Map();
+ for(const r of rows){
+  const key=r.student_id;
+  if(!key)continue;
+  if(!students.has(key))students.set(key,{
+   student_id:key,student_code:r.student_code||"",full_name:r.full_name||"",grade_level:r.grade_level,
+   stream:r.stream||"General",section:r.section||"",subjects:new Map()
   });
-  if(error)throw error;
-  box.innerHTML="";
-  const rows=data||[];
-  if(!rows.length){
-   box.textContent="No submitted or graded results match the selected grade and section.";
-   return;
+  const s=students.get(key);
+  const subjectKey=r.subject_id||r.subject_name||r.exam_id;
+  const previous=s.subjects.get(subjectKey);
+  const submittedTime=r.submitted_at?new Date(r.submitted_at).getTime():0;
+  const previousTime=previous?.submitted_at?new Date(previous.submitted_at).getTime():0;
+  if(!previous || submittedTime>=previousTime){
+   s.subjects.set(subjectKey,r);
+   if(r.subject_name)subjectMap.set(r.subject_id||r.subject_name,r.subject_name);
   }
-  const total=rows.length;
-  const scores=rows.map(r=>Number(r.score)).filter(Number.isFinite);
-  const average=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2):"—";
-  const highest=scores.length?Math.max(...scores).toFixed(2):"—";
-  const lowest=scores.length?Math.min(...scores).toFixed(2):"—";
-  $("resultsSummary").textContent="Students/results: "+total+" | Average: "+average+" | Highest: "+highest+" | Lowest: "+lowest;
-  const table=document.createElement("table");
-  table.style.width="100%";table.style.borderCollapse="collapse";table.style.marginTop="14px";
-  const headers=["Student ID","Student Name","Grade","Stream","Section","Subject","Exam","Score","Total","Percentage","Status","Submitted"];
+ }
+ const subjects=[...subjectMap.entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
+ const roster=[...students.values()].map(s=>{
+  let total=0,max=0,completed=0;
+  const marks={};
+  for(const [subjectId,subjectName] of subjects){
+   const r=s.subjects.get(subjectId);
+   if(r){
+    const score=Number(r.score);
+    const tm=Number(r.total_marks);
+    if(Number.isFinite(score)){total+=score;completed++;}
+    if(Number.isFinite(tm))max+=tm;
+    marks[subjectName]=Number.isFinite(score)?score:"—";
+   }else marks[subjectName]="—";
+  }
+  const percentage=max?Number(((total/max)*100).toFixed(2)):0;
+  return {...s,total, max, average:completed?Number((total/completed).toFixed(2)):0, percentage, completed, marks};
+ });
+ roster.sort((a,b)=>b.percentage-a.percentage || b.total-a.total || a.full_name.localeCompare(b.full_name));
+ let lastPercent=null,lastRank=0;
+ roster.forEach((r,i)=>{
+  if(lastPercent===null||r.percentage!==lastPercent)lastRank=i+1;
+  r.rank=lastRank;lastPercent=r.percentage;
+  r.status=r.completed===subjects.length&&subjects.length>0?"Complete":"Incomplete";
+ });
+ return {roster,subjects:subjects.map(x=>x[1])};
+}
+async function getFilteredResultRows(){
+ if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
+ const grade=$("resultGrade").value;
+ const section=$("resultSection").value.trim();
+ const stream=$("resultStream").value||null;
+ const subject=$("resultSubject").value||null;
+ const exam=$("resultExam").value||null;
+ if(!grade)throw Error("Select a grade.");
+ const {data,error}=await db.rpc("get_admin_student_results",{
+  p_grade_level:Number(grade),p_section:section||null,p_stream:stream,p_subject_id:subject,p_exam_id:exam
+ });
+ if(error)throw error;
+ return data||[];
+}
+async function renderResults(){
+ const box=$("resultsList");box.textContent="Loading…";$("resultsSummary").textContent="";
+ try{
+  const rows=await getFilteredResultRows();
+  if(!rows.length){box.textContent="No submitted or graded results match the selected filters.";return;}
+  const {roster,subjects}=buildResultRoster(rows);
+  $("resultsSummary").textContent="Students: "+roster.length+" | Subjects: "+subjects.length+" | Class average: "+(roster.length?(roster.reduce((a,b)=>a+b.percentage,0)/roster.length).toFixed(2):"0")+"% | Highest: "+(roster.length?roster[0].percentage.toFixed(2):"0")+"% | Lowest: "+(roster.length?roster[roster.length-1].percentage.toFixed(2):"0")+"%";
+  box.innerHTML="";
+  const table=document.createElement("table");table.style.width="100%";table.style.borderCollapse="collapse";table.style.marginTop="14px";
+  const headers=["Rank","Student ID","Student Name","Grade","Stream","Section",...subjects,"Total","Average","Percentage","Status"];
   const thead=document.createElement("thead");const trh=document.createElement("tr");
   headers.forEach(h=>{const th=document.createElement("th");th.textContent=h;th.style.padding="8px";th.style.borderBottom="2px solid #cbd5e1";th.style.textAlign="left";trh.append(th);});
   thead.append(trh);table.append(thead);
   const tbody=document.createElement("tbody");
-  rows.forEach(r=>{
+  roster.forEach(r=>{
    const tr=document.createElement("tr");
-   [r.student_code||"—",r.full_name||"—",r.grade_level,r.stream||"General",r.section||"—",r.subject_name||"—",r.exam_title||"—",
-    r.score??"—",r.total_marks??"—",r.percentage==null?"—":r.percentage+"%",r.status,r.submitted_at?new Date(r.submitted_at).toLocaleString():"—"
-   ].forEach(v=>{const td=document.createElement("td");td.textContent=String(v);td.style.padding="8px";td.style.borderBottom="1px solid #e2e8f0";tr.append(td);});
+   const vals=[r.rank,r.student_code||"—",r.full_name||"—",r.grade_level,r.stream,r.section||"—",...subjects.map(s=>r.marks[s]),r.total,r.average.toFixed(2),r.percentage.toFixed(2)+"%",r.status];
+   vals.forEach(v=>{const td=document.createElement("td");td.textContent=String(v);td.style.padding="8px";td.style.borderBottom="1px solid #e2e8f0";tr.append(td);});
    tbody.append(tr);
   });
   table.append(tbody);box.append(table);
- }catch(err){
-  box.textContent="";
-  message("resultsMessage",err.message||"Could not load results.");
- }
+ }catch(err){box.textContent="";message("resultsMessage",err.message||"Could not generate result roster.");}
 }
-$("resultGrade").addEventListener("change",async()=>{
- $("resultSubject").value="";
- await loadResultFilterOptions();
-});
+$("resultGrade").addEventListener("change",async()=>{$("resultSubject").value="";await loadResultFilterOptions();});
 $("resultSubject").addEventListener("change",async()=>{await loadResultExams();});
 $("loadFilteredResultsButton").addEventListener("click",renderResults);
+$("printResultsButton").addEventListener("click",async()=>{
+ try{
+  const rows=await getFilteredResultRows();if(!rows.length)throw Error("No results to print.");
+  const {roster,subjects}=buildResultRoster(rows);
+  const grade=$("resultGrade").value,stream=$("resultStream").value||"All streams",section=$("resultSection").value.trim()||"All sections";
+  const subjectHeaders=subjects.map(s=>"<th>"+String(s).replace(/[&<>\"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m])))+"</th>").join("");
+  const body=roster.map(r=>"<tr><td>"+r.rank+"</td><td>"+r.student_code+"</td><td>"+r.full_name+"</td><td>"+r.stream+"</td><td>"+r.section+"</td>"+subjects.map(s=>"<td>"+r.marks[s]+"</td>").join("")+"<td>"+r.total+"</td><td>"+r.average.toFixed(2)+"</td><td>"+r.percentage.toFixed(2)+"%</td><td>"+r.status+"</td></tr>").join("");
+  const w=window.open("","_blank");if(!w)throw Error("Allow pop-ups to print the roster.");
+  w.document.write("<!doctype html><html><head><title>CHELENQO Result Roster</title><style>body{font-family:Arial;padding:20px}h1,h2{text-align:center}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #999;padding:5px;text-align:center}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>CHELENQO SECONDARY SCHOOL</h1><h2>Student Result Roster</h2><p><b>Grade:</b> "+grade+" &nbsp; <b>Stream:</b> "+stream+" &nbsp; <b>Section:</b> "+section+"</p><table><thead><tr><th>Rank</th><th>Student ID</th><th>Student Name</th><th>Stream</th><th>Section</th>"+subjectHeaders+"<th>Total</th><th>Average</th><th>Percentage</th><th>Status</th></tr></thead><tbody>"+body+"</tbody></table><script>window.onload=()=>window.print();<\/script></body></html>");w.document.close();
+ }catch(err){message("resultsMessage",err.message||"Could not print roster.");}
+});
 $("downloadResultsXlsxButton").addEventListener("click",async()=>{
  try{
-  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
-  const grade=$("resultGrade").value;
-  const section=$("resultSection").value.trim();
-  const stream=$("resultStream").value||null;
-  const subject=$("resultSubject").value||null;
-  const exam=$("resultExam").value||null;
-  if(!grade)throw Error("Select a grade before downloading results.");
   if(!window.XLSX)throw Error("The Excel export library did not load. Refresh the page and try again.");
-  const {data,error}=await db.rpc("get_admin_student_results",{
-   p_grade_level:Number(grade),
-   p_section:section||null,
-   p_stream:stream,
-   p_subject_id:subject,
-   p_exam_id:exam
+  const rows=await getFilteredResultRows();if(!rows.length)throw Error("No results to export.");
+  const {roster,subjects}=buildResultRoster(rows);
+  const exportRows=roster.map(r=>{
+   const out={"Rank":r.rank,"Student ID":r.student_code,"Student Name":r.full_name,"Grade":r.grade_level,"Stream":r.stream,"Section":r.section};
+   subjects.forEach(s=>out[s]=r.marks[s]);
+   out["Total"]=r.total;out["Average"]=r.average;out["Percentage"]=r.percentage/100;out["Status"]=r.status;return out;
   });
-  if(error)throw error;
-  const rows=(data||[]).map(r=>({
-   "Student ID":r.student_code||"",
-   "Student Name":r.full_name||"",
-   "Grade":r.grade_level??"",
-   "Stream":r.stream||"General",
-   "Section":r.section||"",
-   "Subject":r.subject_name||"",
-   "Examination":r.exam_title||"",
-   "Score":r.score??"",
-   "Total Marks":r.total_marks??"",
-   "Percentage":r.percentage==null?"":Number(r.percentage)/100,
-   "Status":r.status||"",
-   "Submitted":r.submitted_at?new Date(r.submitted_at).toLocaleString():""
-  }));
-  if(!rows.length)throw Error("No submitted or graded results match the selected filters.");
-  const ws=XLSX.utils.json_to_sheet(rows);
-  ws["!cols"]=[
-   {wch:16},{wch:26},{wch:8},{wch:18},{wch:12},{wch:22},{wch:32},
-   {wch:10},{wch:12},{wch:14},{wch:14},{wch:24}
-  ];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,"Results");
-  const gradePart="Grade-"+grade;
-  const sectionPart=section?"-Section-"+section.replace(/[^A-Za-z0-9_-]/g,"_"):"";
-  const examPart=exam?"-Exam":"-All-Exams";
-  XLSX.writeFile(wb,"CHELENQO-Results-"+gradePart+sectionPart+examPart+".xlsx");
-  message("resultsMessage",rows.length+" result(s) exported to Excel.","success");
- }catch(err){message("resultsMessage",err.message||"Could not export results.");}
+  const ws=XLSX.utils.json_to_sheet(exportRows);ws["!cols"]=[{wch:8},{wch:16},{wch:26},{wch:8},{wch:20},{wch:12},...subjects.map(()=>({wch:16})),{wch:12},{wch:12},{wch:14},{wch:14}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Result Roster");
+  const grade=$("resultGrade").value,section=$("resultSection").value.trim();
+  XLSX.writeFile(wb,"CHELENQO-Result-Roster-Grade-"+grade+(section?"-Section-"+section.replace(/[^A-Za-z0-9_-]/g,"_"):"")+".xlsx");
+  message("resultsMessage",roster.length+" student roster row(s) exported to Excel.","success");
+ }catch(err){message("resultsMessage",err.message||"Could not export roster.");}
 });
 $("clearResultFiltersButton").addEventListener("click",async()=>{
  $("resultGrade").value="";$("resultStream").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';
