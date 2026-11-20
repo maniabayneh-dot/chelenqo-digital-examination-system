@@ -378,7 +378,8 @@ $("studentPasswordForm").addEventListener("submit",async e=>{
   $("studentPasswordForm").reset();
   $("studentPasswordSetup").classList.add("hidden");
   $("loadStudentExamsButton").classList.remove("hidden");
-  message("studentLoginMessage","Your personal password has been saved. You can now load your examinations.","success");
+  message("studentLoginMessage","Your personal password has been saved. Loading your available examinations…","success");
+  await loadStudentExams();
  }catch(err){message("studentPasswordMessage",err.message||"Could not save your password.");}
 });
 
