@@ -38,7 +38,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 </header>
 <nav>
 <button id="studentTab" type="button">Student Examination</button>
-<button id="loginTab" type="button" class="secondary">Administrator Sign-in</button>
+<button id="loginTab" type="button" class="secondary" onclick="document.getElementById('studentPanel').classList.add('hidden');document.getElementById('loginPanel').classList.remove('hidden');">Administrator Sign-in</button>
 <button id="teacherTab" type="button" class="secondary hidden">Teacher / Admin Dashboard</button>
 <button id="resultsTab" type="button" class="secondary hidden">Results</button>
 <button id="signOutTab" type="button" class="danger hidden">Sign out</button>
