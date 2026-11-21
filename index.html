@@ -28,7 +28,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
 <header>
@@ -52,7 +52,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <input id="studentIdInput" maxlength="40" required autocomplete="username" autocapitalize="characters" placeholder="CHS-09-0001">
 <label for="studentPasswordInput">Password</label>
 <input id="studentPasswordInput" type="password" required autocomplete="current-password">
-<div id="studentCaptcha" class="item" aria-label="Student CAPTCHA verification"></div>
+<div id="studentCaptcha" class="item cf-turnstile" data-sitekey="0x4AAAAAAGBRdu8NmYgzAWNN" data-callback="onStudentCaptchaSuccess" data-expired-callback="onStudentCaptchaExpired" data-error-callback="onStudentCaptchaError" aria-label="Student CAPTCHA verification"></div>
 <button id="studentLoginButton" class="primary">Student sign in</button>
 <p id="studentLoginMessage" role="alert"></p>
 </form>
@@ -104,7 +104,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <form id="loginForm">
 <label for="loginEmail">Teacher or administrator email</label><input id="loginEmail" type="email" required autocomplete="username">
 <label for="loginPassword">Password</label><input id="loginPassword" type="password" required autocomplete="current-password">
-<div id="staffCaptcha" class="item" aria-label="Staff CAPTCHA verification"></div>
+<div id="staffCaptcha" class="item cf-turnstile" data-sitekey="0x4AAAAAAGBRdu8NmYgzAWNN" data-callback="onStaffCaptchaSuccess" data-expired-callback="onStaffCaptchaExpired" data-error-callback="onStaffCaptchaError" aria-label="Staff CAPTCHA verification"></div>
 <button id="loginButton" class="primary">Sign in</button><p id="loginMessage" role="alert"></p>
 </form>
 <p class="muted">Only authenticated CHELENQO teachers and administrators can use this dashboard. Teachers can access only their assigned subjects.</p>
@@ -232,25 +232,26 @@ const SUPABASE_PUBLISHABLE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
 const REQUIRED_SCHOOL_ID="CHELENQO";
 const TURNSTILE_SITE_KEY="0x4AAAAAAGBRdu8NmYgzAWNN";
 let studentCaptchaWidget=null,staffCaptchaWidget=null,studentCaptchaToken="",staffCaptchaToken="";
-function initTurnstile(){
- if(!window.turnstile){setTimeout(initTurnstile,250);return;}
- try{
-  if(!$("studentPanel").classList.contains("hidden")&&studentCaptchaWidget===null){
-   studentCaptchaWidget=window.turnstile.render("#studentCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>{studentCaptchaToken=t;},"expired-callback":()=>{studentCaptchaToken="";},"error-callback":()=>{studentCaptchaToken="";}});
-  }
-  if(!$("loginPanel").classList.contains("hidden")&&staffCaptchaWidget===null){
-   staffCaptchaWidget=window.turnstile.render("#staffCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>{staffCaptchaToken=t;},"expired-callback":()=>{staffCaptchaToken="";},"error-callback":()=>{staffCaptchaToken="";}});
-  }
- }catch(err){console.error("Turnstile initialization failed:",err);}
-}
+function onStudentCaptchaSuccess(token){studentCaptchaToken=token||"";}
+function onStudentCaptchaExpired(){studentCaptchaToken="";}
+function onStudentCaptchaError(){studentCaptchaToken="";}
+function onStaffCaptchaSuccess(token){staffCaptchaToken=token||"";}
+function onStaffCaptchaExpired(){staffCaptchaToken="";}
+function onStaffCaptchaError(){staffCaptchaToken="";}
 function resetCaptcha(kind){
  if(!window.turnstile)return;
- if(kind==="student"){studentCaptchaToken="";if(studentCaptchaWidget!==null)window.turnstile.reset(studentCaptchaWidget);}
- else{staffCaptchaToken="";if(staffCaptchaWidget!==null)window.turnstile.reset(staffCaptchaWidget);}
+ if(kind==="student"){
+  studentCaptchaToken="";
+  const el=document.querySelector("#studentCaptcha");
+  if(el)window.turnstile.reset(el);
+ }else{
+  staffCaptchaToken="";
+  const el=document.querySelector("#staffCaptcha");
+  if(el)window.turnstile.reset(el);
+ }
 }
-document.addEventListener("DOMContentLoaded",initTurnstile);
 const $=id=>document.getElementById(id);
-$("loginTab").addEventListener("click",()=>{$("studentPanel").classList.add("hidden");$("loginPanel").classList.remove("hidden");initTurnstile();});
+$("loginTab").addEventListener("click",()=>{$("studentPanel").classList.add("hidden");$("loginPanel").classList.remove("hidden");});
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
  auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
 });
