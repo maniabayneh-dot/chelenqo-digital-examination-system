@@ -353,7 +353,7 @@ $("studentLoginForm").addEventListener("submit",async e=>{
   });
   resetCaptcha("student");
   if(loginError)throw Error("Student ID or password is incorrect.");
-  studentCurrentPassword=password;
+  /* Password is never stored in JavaScript after authentication. */
   const {data:profile,error:profileError}=await db.from("profiles")
    .select("role,school_id,student_code,must_change_password,stream")
    .eq("id",loginData.session.user.id)
@@ -375,13 +375,12 @@ $("studentLoginForm").addEventListener("submit",async e=>{
 
 $("studentPasswordForm").addEventListener("submit",async e=>{
  e.preventDefault();
- const password=$("newStudentPassword").value;
- const confirmation=$("confirmStudentPassword").value;
+ const password=$("newStudentPassword").value.trim();
+ const confirmation=$("confirmStudentPassword").value.trim();
  try{
   if(password.length<8)throw Error("Choose a password with at least 8 characters.");
   if(password!==confirmation)throw Error("The two passwords do not match.");
-  if(!studentCurrentPassword)throw Error("For security, sign out and sign in again before setting your first password.");
-  const {error:updateError}=await db.auth.updateUser({current_password:studentCurrentPassword,password});
+  const {error:updateError}=await db.auth.updateUser({password});
   if(updateError)throw updateError;
   const {error:completeError}=await db.rpc("complete_student_password_setup");
   if(completeError)throw completeError;
@@ -392,7 +391,10 @@ $("studentPasswordForm").addEventListener("submit",async e=>{
   $("loadStudentExamsButton").classList.remove("hidden");
   message("studentLoginMessage","Your personal password has been saved. Loading your available examinations…","success");
   await loadStudentExams();
- }catch(err){message("studentPasswordMessage",err.message||"Could not save your password.");}
+ }catch(err){
+  console.error("Password setup error:",err);
+  message("studentPasswordMessage",err.message||"Could not save your password.");
+ }
 });
 
 $("loadStudentExamsButton").addEventListener("click",loadStudentExams);
