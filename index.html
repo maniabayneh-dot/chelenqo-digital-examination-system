@@ -234,12 +234,14 @@ const TURNSTILE_SITE_KEY="0x4AAAAAAGBRdu8NmYgzAWNN";
 let studentCaptchaWidget=null,staffCaptchaWidget=null,studentCaptchaToken="",staffCaptchaToken="";
 function initTurnstile(){
  if(!window.turnstile){setTimeout(initTurnstile,250);return;}
- if(!$("studentPanel").classList.contains("hidden")&&studentCaptchaWidget===null){
-  studentCaptchaWidget=window.turnstile.render("#studentCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>studentCaptchaToken=t,"expired-callback":()=>studentCaptchaToken="","error-callback":()=>studentCaptchaToken=""});
- }
- if(!$("loginPanel").classList.contains("hidden")&&staffCaptchaWidget===null){
-  staffCaptchaWidget=window.turnstile.render("#staffCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>staffCaptchaToken=t,"expired-callback":()=>staffCaptchaToken="","error-callback":()=>staffCaptchaToken=""});
- }
+ try{
+  if(!$("studentPanel").classList.contains("hidden")&&studentCaptchaWidget===null){
+   studentCaptchaWidget=window.turnstile.render("#studentCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>{studentCaptchaToken=t;},"expired-callback":()=>{studentCaptchaToken="";},"error-callback":()=>{studentCaptchaToken="";}});
+  }
+  if(!$("loginPanel").classList.contains("hidden")&&staffCaptchaWidget===null){
+   staffCaptchaWidget=window.turnstile.render("#staffCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>{staffCaptchaToken=t;},"expired-callback":()=>{staffCaptchaToken="";},"error-callback":()=>{staffCaptchaToken="";}});
+  }
+ }catch(err){console.error("Turnstile initialization failed:",err);}
 }
 function resetCaptcha(kind){
  if(!window.turnstile)return;
@@ -345,7 +347,7 @@ $("studentLoginForm").addEventListener("submit",async e=>{
   const password=$("studentPasswordInput").value;
   if(!/^CHS-[0-9]{2}-[0-9]{4,}$/.test(studentId))throw Error("Enter the CHELENQO student ID printed on your credential slip.");
   if(!password)throw Error("Enter your password.");
-  if(!studentCaptchaToken)throw Error("Complete the CAPTCHA verification before continuing.");
+  if(!studentCaptchaToken){initTurnstile();throw Error("Complete the CAPTCHA verification before continuing. If the CAPTCHA is not visible, refresh the page and try again.");}
   const {data:loginData,error:loginError}=await db.auth.signInWithPassword({
    email:studentAuthEmail(studentId),
    password,
