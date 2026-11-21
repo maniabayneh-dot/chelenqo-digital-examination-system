@@ -238,6 +238,27 @@ function onStudentCaptchaError(){studentCaptchaToken="";}
 function onStaffCaptchaSuccess(token){staffCaptchaToken=token||"";}
 function onStaffCaptchaExpired(){staffCaptchaToken="";}
 function onStaffCaptchaError(){staffCaptchaToken="";}
+function initTurnstile(){
+  if(!window.turnstile)return;
+  try{
+    const studentEl=document.querySelector("#studentCaptcha");
+    if(studentEl && !studentEl.querySelector("iframe") && !studentEl.dataset.turnstileRendered){
+      studentCaptchaWidget=window.turnstile.render(studentEl,{sitekey:TURNSTILE_SITE_KEY,callback:onStudentCaptchaSuccess,"expired-callback":onStudentCaptchaExpired,"error-callback":onStudentCaptchaError});
+      studentEl.dataset.turnstileRendered="1";
+    }
+    const staffEl=document.querySelector("#staffCaptcha");
+    if(staffEl && !staffEl.querySelector("iframe") && !staffEl.dataset.turnstileRendered){
+      staffCaptchaWidget=window.turnstile.render(staffEl,{sitekey:TURNSTILE_SITE_KEY,callback:onStaffCaptchaSuccess,"expired-callback":onStaffCaptchaExpired,"error-callback":onStaffCaptchaError});
+      staffEl.dataset.turnstileRendered="1";
+    }
+  }catch(err){console.warn("Turnstile initialization:",err.message);}
+}
+function openLoginPanel(){
+  showPanel("loginPanel");
+  const email=$("loginEmail");
+  if(email)email.focus();
+  setTimeout(initTurnstile,0);
+}
 function resetCaptcha(kind){
  if(!window.turnstile)return;
  if(kind==="student"){
@@ -251,7 +272,7 @@ function resetCaptcha(kind){
  }
 }
 const $=id=>document.getElementById(id);
-$("loginTab").addEventListener("click",()=>{showPanel("loginPanel");$("loginEmail").focus();});
+$("loginTab").addEventListener("click",openLoginPanel);
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
  auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
 });
@@ -857,7 +878,8 @@ $("clearResultFiltersButton").addEventListener("click",async()=>{
  $("resultsSummary").textContent="";$("resultsList").textContent="";message("resultsMessage","Filters cleared.","muted");
 });
 $("studentTab").addEventListener("click",()=>showPanel("studentPanel"));
-// Administrator Sign-in click handler is registered before Supabase initialization above.
+// Keep the administrator entry point available even if another initialization step is delayed.
+$("loginTab").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openLoginPanel();}});
 $("teacherTab").addEventListener("click",async()=>{if(await refreshAdmin()){await loadSubjects();await renderExamList();showPanel("teacherPanel");}else showPanel("loginPanel");});
 $("resultsTab").addEventListener("click",async()=>{showPanel("resultsPanel");await loadResultFilterOptions();});
 $("signOutTab").addEventListener("click",async()=>{await db.auth.signOut();setAdmin(false);showPanel("studentPanel");});
