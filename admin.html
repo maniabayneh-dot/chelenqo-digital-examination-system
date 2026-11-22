@@ -25,6 +25,7 @@ footer{text-align:center;color:var(--muted);padding:20px;font-size:13px}
 @media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.filters{grid-template-columns:1fr}}
 @media print{body{background:white}header{background:white;color:black;padding:8px}main{max-width:none;margin:0;padding:0}.no-print,#loginCard,footer{display:none!important}.card{box-shadow:none;padding:8px;margin:0}.tablewrap{overflow:visible}table{min-width:0}th,td{font-size:10px;padding:6px}}
 </style>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
 <header><h1>CHELENQO SECONDARY SCHOOL</h1><p>Student Roster Management</p></header>
@@ -48,7 +49,8 @@ footer{text-align:center;color:var(--muted);padding:20px;font-size:13px}
   <form id="forgotPasswordForm">
     <label for="resetEmail">Administrator email</label>
     <input id="resetEmail" type="email" autocomplete="email" required>
-    <button id="sendResetButton" type="submit" style="width:100%;margin-top:12px">Send reset email</button>
+    <div id="resetCaptcha" style="margin:12px 0" class="cf-turnstile" data-sitekey="0x4AAAAAAGBRdu8NmYgzAWNN" data-callback="onResetCaptchaSuccess" data-expired-callback="onResetCaptchaExpired" data-error-callback="onResetCaptchaError"></div>
+  <button id="sendResetButton" type="submit" style="width:100%;margin-top:12px">Send reset email</button>
   </form>
   <p id="resetRequestMessage" class="message" role="alert" aria-live="polite"></p>
   <a id="backToLoginLink" href="#" class="muted">Back to administrator sign in</a>
@@ -103,7 +105,10 @@ const SUPABASE_URL="https://yqwbdpsbtugunmtbvito.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
 const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id);
-let allStudents=[];let visibleStudents=[];
+let allStudents=[];let visibleStudents=[];let resetCaptchaToken="";
+function onResetCaptchaSuccess(token){resetCaptchaToken=token||"";}
+function onResetCaptchaExpired(){resetCaptchaToken="";}
+function onResetCaptchaError(){resetCaptchaToken="";}
 function showLogin(message=""){$("loginCard").classList.remove("hidden");$("resetCard").classList.add("hidden");$("recoveryCard").classList.add("hidden");$("rosterCard").classList.add("hidden");$("loginMessage").textContent=message}
 function showRoster(){$("loginCard").classList.add("hidden");$("resetCard").classList.add("hidden");$("recoveryCard").classList.add("hidden");$("rosterCard").classList.remove("hidden")}
 function showResetCard(){$("loginCard").classList.add("hidden");$("recoveryCard").classList.add("hidden");$("rosterCard").classList.add("hidden");$("resetCard").classList.remove("hidden")}
@@ -210,13 +215,14 @@ $("forgotPasswordForm").addEventListener("submit",async event=>{
   $("resetRequestMessage").className="";
   try{
     const email=$("resetEmail").value.trim();
-    const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:recoveryRedirectUrl()});
+    if(!resetCaptchaToken)throw new Error("Please complete the CAPTCHA verification first.");
+    const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:recoveryRedirectUrl(),captchaToken:resetCaptchaToken});
     if(error)throw error;
     $("resetRequestMessage").className="success";
     $("resetRequestMessage").textContent="If this administrator email is registered, a password-reset email has been sent. Check your inbox and spam folder.";
   }catch(error){
     $("resetRequestMessage").textContent=error.message||"Could not send the reset email.";
-  }finally{button.disabled=false;button.textContent="Send reset email";}
+  }finally{button.disabled=false;button.textContent="Send reset email";resetCaptchaToken="";if(window.turnstile){const el=document.getElementById("resetCaptcha");if(el){try{window.turnstile.reset(el)}catch(e){}}}}
 });
 $("recoveryForm").addEventListener("submit",async event=>{
   event.preventDefault();
