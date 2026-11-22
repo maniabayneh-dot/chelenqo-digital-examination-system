@@ -105,7 +105,10 @@ const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,
 const $=id=>document.getElementById(id);
 let allStudents=[];let visibleStudents=[];
 function showLogin(message=""){$("loginCard").classList.remove("hidden");$("resetCard").classList.add("hidden");$("recoveryCard").classList.add("hidden");$("rosterCard").classList.add("hidden");$("loginMessage").textContent=message}
-function showRoster(){$("loginCard").classList.add("hidden");$("resetCard").classList.add("hidden");$("recoveryCard").classList.add("hidden");$("rosterCard").classList.remove("hidden")}\nfunction showResetCard(){$("loginCard").classList.add("hidden");$("recoveryCard").classList.add("hidden");$("rosterCard").classList.add("hidden");$("resetCard").classList.remove("hidden")}\nfunction showRecoveryCard(){$("loginCard").classList.add("hidden");$("resetCard").classList.add("hidden");$("rosterCard").classList.add("hidden");$("recoveryCard").classList.remove("hidden")}\nfunction recoveryRedirectUrl(){return window.location.origin+window.location.pathname}
+function showRoster(){$("loginCard").classList.add("hidden");$("resetCard").classList.add("hidden");$("recoveryCard").classList.add("hidden");$("rosterCard").classList.remove("hidden")}
+function showResetCard(){$("loginCard").classList.add("hidden");$("recoveryCard").classList.add("hidden");$("rosterCard").classList.add("hidden");$("resetCard").classList.remove("hidden")}
+function showRecoveryCard(){$("loginCard").classList.add("hidden");$("resetCard").classList.add("hidden");$("rosterCard").classList.add("hidden");$("recoveryCard").classList.remove("hidden")}
+function recoveryRedirectUrl(){return window.location.origin+window.location.pathname}
 function safeCsv(value){let s=String(value??"");if(/^[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"'}
 async function loadRoster(){
   $("statusMessage").textContent="Loading student records...";
@@ -199,7 +202,42 @@ async function verifyAndShow(user){
   showRoster();
   await loadRoster();
 }
-$("forgotPasswordLink").addEventListener("click",event=>{event.preventDefault();$("resetEmail").value=$("email").value.trim();$("resetRequestMessage").textContent="";showResetCard();});\n$("backToLoginLink").addEventListener("click",event=>{event.preventDefault();showLogin("");$("email").focus();});\n$("forgotPasswordForm").addEventListener("submit",async event=>{\n  event.preventDefault();\n  const button=$("sendResetButton");button.disabled=true;button.textContent="Sending...";\n  $("resetRequestMessage").className="";\n  try{\n    const email=$("resetEmail").value.trim();\n    const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:recoveryRedirectUrl()});\n    if(error)throw error;\n    $("resetRequestMessage").className="success";\n    $("resetRequestMessage").textContent="If this administrator email is registered, a password-reset email has been sent. Check your inbox and spam folder.";\n  }catch(error){\n    $("resetRequestMessage").textContent=error.message||"Could not send the reset email.";\n  }finally{button.disabled=false;button.textContent="Send reset email";}\n});\n$("recoveryForm").addEventListener("submit",async event=>{\n  event.preventDefault();\n  const password=$("newAdminPassword").value;\n  const confirm=$("confirmAdminPassword").value;\n  if(password.length<8){$("recoveryMessage").textContent="Password must be at least 8 characters.";return;}\n  if(password!==confirm){$("recoveryMessage").textContent="The two passwords do not match.";return;}\n  const button=$("updatePasswordButton");button.disabled=true;button.textContent="Updating...";\n  try{\n    const {error}=await client.auth.updateUser({password});\n    if(error)throw error;\n    $("recoveryMessage").className="success";\n    $("recoveryMessage").textContent="Password updated successfully. You can now sign in with your new password.";\n    setTimeout(async()=>{await client.auth.signOut();showLogin("Password reset complete. Sign in with your new password.");},1200);\n  }catch(error){$("recoveryMessage").textContent=error.message||"Could not update the password.";}\n  finally{button.disabled=false;button.textContent="Update password";}\n});\nclient.auth.onAuthStateChange((event)=>{\n  if(event==="PASSWORD_RECOVERY"){showRecoveryCard();}\n});\n\n$("loginForm").addEventListener("submit",async event=>{
+$("forgotPasswordLink").addEventListener("click",event=>{event.preventDefault();$("resetEmail").value=$("email").value.trim();$("resetRequestMessage").textContent="";showResetCard();});
+$("backToLoginLink").addEventListener("click",event=>{event.preventDefault();showLogin("");$("email").focus();});
+$("forgotPasswordForm").addEventListener("submit",async event=>{
+  event.preventDefault();
+  const button=$("sendResetButton");button.disabled=true;button.textContent="Sending...";
+  $("resetRequestMessage").className="";
+  try{
+    const email=$("resetEmail").value.trim();
+    const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:recoveryRedirectUrl()});
+    if(error)throw error;
+    $("resetRequestMessage").className="success";
+    $("resetRequestMessage").textContent="If this administrator email is registered, a password-reset email has been sent. Check your inbox and spam folder.";
+  }catch(error){
+    $("resetRequestMessage").textContent=error.message||"Could not send the reset email.";
+  }finally{button.disabled=false;button.textContent="Send reset email";}
+});
+$("recoveryForm").addEventListener("submit",async event=>{
+  event.preventDefault();
+  const password=$("newAdminPassword").value;
+  const confirm=$("confirmAdminPassword").value;
+  if(password.length<8){$("recoveryMessage").textContent="Password must be at least 8 characters.";return;}
+  if(password!==confirm){$("recoveryMessage").textContent="The two passwords do not match.";return;}
+  const button=$("updatePasswordButton");button.disabled=true;button.textContent="Updating...";
+  try{
+    const {error}=await client.auth.updateUser({password});
+    if(error)throw error;
+    $("recoveryMessage").className="success";
+    $("recoveryMessage").textContent="Password updated successfully. You can now sign in with your new password.";
+    setTimeout(async()=>{await client.auth.signOut();showLogin("Password reset complete. Sign in with your new password.");},1200);
+  }catch(error){$("recoveryMessage").textContent=error.message||"Could not update the password.";}
+  finally{button.disabled=false;button.textContent="Update password";}
+});
+client.auth.onAuthStateChange((event)=>{
+  if(event==="PASSWORD_RECOVERY"){showRecoveryCard();}
+});
+\n$("loginForm").addEventListener("submit",async event=>{
   event.preventDefault();const button=$("loginButton");button.disabled=true;button.textContent="Signing in...";
   try{
     const {data,error}=await client.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
@@ -254,7 +292,11 @@ $("searchInput").addEventListener("input",renderRoster);
 $("gradeFilter").addEventListener("change",renderRoster);
 $("sectionFilter").addEventListener("change",renderRoster);
 $("signOutButton").addEventListener("click",async()=>{await client.auth.signOut();$("loginForm").reset();showLogin("You have signed out.");});
-(async()=>{\n  if(window.location.hash.includes("type=recovery")){showRecoveryCard();return;}\n  const {data}=await client.auth.getSession();\n  if(data.session?.user){try{await verifyAndShow(data.session.user)}catch(error){showLogin(error.message)}}\n})();
+(async()=>{
+  if(window.location.hash.includes("type=recovery")){showRecoveryCard();return;}
+  const {data}=await client.auth.getSession();
+  if(data.session?.user){try{await verifyAndShow(data.session.user)}catch(error){showLogin(error.message)}}
+})();
 </script>
 </body>
 </html>
