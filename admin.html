@@ -38,7 +38,33 @@ footer{text-align:center;color:var(--muted);padding:20px;font-size:13px}
     <button id="loginButton" type="submit" style="width:100%;margin-top:18px">Sign in</button>
   </form>
   <p id="loginMessage" class="message" role="alert" aria-live="polite"></p>
+  <a id="forgotPasswordLink" href="#" class="muted" style="display:inline-block;margin-top:8px;text-decoration:underline">Forgot password?</a>
   <a href="index.html" class="muted">Return to student login</a>
+</section>
+
+<section id="resetCard" class="card hidden">
+  <h2>Reset Administrator Password</h2>
+  <p class="muted">Enter your administrator email. We will send a password-reset link to that email address.</p>
+  <form id="forgotPasswordForm">
+    <label for="resetEmail">Administrator email</label>
+    <input id="resetEmail" type="email" autocomplete="email" required>
+    <button id="sendResetButton" type="submit" style="width:100%;margin-top:12px">Send reset email</button>
+  </form>
+  <p id="resetRequestMessage" class="message" role="alert" aria-live="polite"></p>
+  <a id="backToLoginLink" href="#" class="muted">Back to administrator sign in</a>
+</section>
+
+<section id="recoveryCard" class="card hidden">
+  <h2>Set New Administrator Password</h2>
+  <p class="muted">Choose a new password for your CHELENQO administrator account.</p>
+  <form id="recoveryForm">
+    <label for="newAdminPassword">New password</label>
+    <input id="newAdminPassword" type="password" minlength="8" autocomplete="new-password" required>
+    <label for="confirmAdminPassword">Confirm new password</label>
+    <input id="confirmAdminPassword" type="password" minlength="8" autocomplete="new-password" required>
+    <button id="updatePasswordButton" type="submit" style="width:100%;margin-top:12px">Update password</button>
+  </form>
+  <p id="recoveryMessage" class="message" role="alert" aria-live="polite"></p>
 </section>
 
 <section id="rosterCard" class="hidden">
