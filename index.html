@@ -272,7 +272,7 @@ function resetCaptcha(kind){
  }
 }
 const $=id=>document.getElementById(id);
-$("loginTab").addEventListener("click",openLoginPanel);
+$("loginTab").addEventListener("click",()=>{window.location.href="admin.html";});
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
  auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
 });
@@ -505,6 +505,10 @@ $("loginForm").addEventListener("submit",async e=>{
   resetCaptcha("staff");
   if(error)throw error;
   if(!await refreshAdmin()){await db.auth.signOut();throw Error("This account is not an authorized CHELENQO teacher or administrator.");}
+  if(currentRole==="admin"){
+   window.location.href="admin.html";
+   return;
+  }
   $("loginForm").reset();await loadSubjects();await renderExamList();showPanel("teacherPanel");
  }catch(err){message("loginMessage",err.message||"Sign-in failed.");}
  finally{$("loginButton").disabled=false;}
