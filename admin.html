@@ -129,12 +129,47 @@ function exportCsv(){
   const a=document.createElement("a");a.href=url;a.download="CHELENQO_student_roster.csv";document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
 }
 async function verifyAndShow(user){
-  const {data:profile,error}=await client.from("profiles").select("full_name,role,school_id").eq("id",user.id).single();
-  if(error||!profile||profile.role!=="admin"||profile.school_id!=="CHELENQO"){
-    await client.auth.signOut();throw new Error("This page is restricted to CHELENQO administrators.");
+  if(!user?.id){
+    throw new Error("No authenticated user was found.");
   }
-  $("adminName").textContent="Signed in as "+(profile.full_name||"Administrator");
-  showRoster();await loadRoster();
+
+  const {data:profile,error} = await client
+    .from("profiles")
+    .select("full_name,role,school_id")
+    .eq("id",user.id)
+    .maybeSingle();
+
+  console.log("Authenticated user:", user);
+  console.log("Profile:", profile);
+  console.log("Profile error:", error);
+
+  if(error){
+    throw new Error(
+      "Your account signed in, but the administrator profile could not be read. " +
+      "Database error: " + error.message
+    );
+  }
+
+  if(!profile){
+    await client.auth.signOut();
+    throw new Error("Your account has no CHELENQO profile.");
+  }
+
+  if(profile.role !== "admin"){
+    await client.auth.signOut();
+    throw new Error("Your profile role is '" + profile.role + "', not 'admin'.");
+  }
+
+  if(profile.school_id !== "CHELENQO"){
+    await client.auth.signOut();
+    throw new Error("Your administrator profile is not assigned to CHELENQO.");
+  }
+
+  $("adminName").textContent =
+    "Signed in as " + (profile.full_name || "Administrator");
+
+  showRoster();
+  await loadRoster();
 }
 $("loginForm").addEventListener("submit",async event=>{
   event.preventDefault();const button=$("loginButton");button.disabled=true;button.textContent="Signing in...";
