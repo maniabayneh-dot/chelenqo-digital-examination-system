@@ -67,11 +67,13 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <h3>Set your personal password</h3>
 <p class="notice">This is your first sign-in. Choose a new password before opening examinations. Do not share it with other students.</p>
 <form id="studentPasswordForm">
-<label for="newStudentPassword">New password (at least 8 characters)</label>
-<input id="newStudentPassword" type="password" minlength="8" required autocomplete="new-password">
+<label for="currentStudentPassword">Temporary password</label>
+<input id="currentStudentPassword" type="password" required autocomplete="current-password" placeholder="Enter your temporary password">
+<label for="newStudentPassword">New password (at least 10 characters)</label>
+<input id="newStudentPassword" type="password" minlength="10" required autocomplete="new-password" placeholder="Choose your personal password">
 <label for="confirmStudentPassword">Confirm new password</label>
-<input id="confirmStudentPassword" type="password" minlength="8" required autocomplete="new-password">
-<button class="primary">Save my password</button>
+<input id="confirmStudentPassword" type="password" minlength="10" required autocomplete="new-password" placeholder="Enter your new password again">
+<button class="primary" type="submit">Save my password</button>
 <p id="studentPasswordMessage" role="alert"></p>
 </form>
 </div>
@@ -323,7 +325,7 @@ function showVerifiedStudent(data, notice="Student account recognized.", mustCha
  $("studentPasswordSetup").classList.toggle("hidden",!studentMustChangePassword);
  $("loadStudentExamsButton").classList.toggle("hidden",studentMustChangePassword);
  $("studentExamList").textContent="";
- message("studentLoginMessage",notice,"success");
+ message("studentLoginMessage",mustChange?"First sign-in: enter your temporary password and choose a personal password.":notice,"success");
 }
 
 async function restoreVerifiedStudentSession() {
@@ -399,22 +401,41 @@ $("studentLoginForm").addEventListener("submit",async e=>{
 
 $("studentPasswordForm").addEventListener("submit",async e=>{
  e.preventDefault();
+
+ const currentPassword=$("currentStudentPassword").value;
  const password=$("newStudentPassword").value.trim();
  const confirmation=$("confirmStudentPassword").value.trim();
+
  try{
-  if(password.length<8)throw Error("Choose a password with at least 8 characters.");
-  if(password!==confirmation)throw Error("The two passwords do not match.");
-  const {error:updateError}=await db.auth.updateUser({password});
+  if(!currentPassword)throw Error("Enter the temporary password provided by CHELENQO.");
+  if(password.length<10)throw Error("Choose a password with at least 10 characters.");
+  if(password!==confirmation)throw Error("The two new passwords do not match.");
+  if(!student?.student_code)throw Error("Student account information is missing. Sign in again.");
+
+  /*
+   * Supabase is configured to require the current password
+   * when a password is changed. The temporary password is
+   * supplied only for this authenticated password-change request.
+   */
+  const {error:updateError}=await db.auth.updateUser({
+   password,
+   current_password:currentPassword
+  });
+
   if(updateError)throw updateError;
+
   const {error:completeError}=await db.rpc("complete_student_password_setup");
   if(completeError)throw completeError;
+
   studentMustChangePassword=false;
   studentCurrentPassword="";
   $("studentPasswordForm").reset();
   $("studentPasswordSetup").classList.add("hidden");
   $("loadStudentExamsButton").classList.remove("hidden");
+
   message("studentLoginMessage","Your personal password has been saved. Loading your available examinations…","success");
   await loadStudentExams();
+
  }catch(err){
   console.error("Password setup error:",err);
   message("studentPasswordMessage",err.message||"Could not save your password.");
