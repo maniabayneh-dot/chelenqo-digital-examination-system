@@ -394,7 +394,7 @@ $("studentLoginForm").addEventListener("submit",async e=>{
   const row=Array.isArray(data)?data[0]:data;
   if(!row?.student_code){await db.auth.signOut();throw Error("Student account is not linked to a valid CHELENQO registration.");}
   row.stream=profile.stream||"General";
-  showVerifiedStudent(row,profile.must_change_password?"First sign-in: set a personal password to continue.":"Student sign-in successful.",profile.must_change_password);
+  showVerifiedStudent(row,profile.must_change_password?"First sign-in: enter the temporary password and set a personal password to continue.":"Student sign-in successful.",profile.must_change_password);
  }catch(err){message("studentLoginMessage",err.message||"Student sign-in failed.");}
  finally{btn.disabled=false;}
 });
