@@ -28,7 +28,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
 <body>
 <header>
@@ -52,7 +52,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <input id="studentIdInput" maxlength="40" required autocomplete="username" autocapitalize="characters" placeholder="CHS-09-0001">
 <label for="studentPasswordInput">Password</label>
 <input id="studentPasswordInput" type="password" required autocomplete="current-password">
-<div id="studentCaptcha" class="item cf-turnstile" data-sitekey="0x4AAAAAAGBRdu8NmYgzAWNN" data-callback="onStudentCaptchaSuccess" data-expired-callback="onStudentCaptchaExpired" data-error-callback="onStudentCaptchaError" aria-label="Student CAPTCHA verification"></div>
+<div id="studentCaptcha" class="item" aria-label="Student CAPTCHA verification"></div>
 <button id="studentLoginButton" class="primary">Student sign in</button>
 <p id="studentLoginMessage" role="alert"></p>
 </form>
@@ -106,7 +106,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <form id="loginForm">
 <label for="loginEmail">Teacher or administrator email</label><input id="loginEmail" type="email" required autocomplete="username">
 <label for="loginPassword">Password</label><input id="loginPassword" type="password" required autocomplete="current-password">
-<div id="staffCaptcha" class="item cf-turnstile" data-sitekey="0x4AAAAAAGBRdu8NmYgzAWNN" data-callback="onStaffCaptchaSuccess" data-expired-callback="onStaffCaptchaExpired" data-error-callback="onStaffCaptchaError" aria-label="Staff CAPTCHA verification"></div>
+<div id="staffCaptcha" class="item" aria-label="Staff CAPTCHA verification"></div>
 <button id="loginButton" class="primary">Sign in</button><p id="loginMessage" role="alert"></p>
 </form>
 <p class="muted">Only authenticated CHELENQO teachers and administrators can use this dashboard. Teachers can access only their assigned subjects.</p>
@@ -244,16 +244,26 @@ function initTurnstile(){
   if(!window.turnstile)return;
   try{
     const studentEl=document.querySelector("#studentCaptcha");
-    if(studentEl && !studentEl.querySelector("iframe") && !studentEl.dataset.turnstileRendered){
-      studentCaptchaWidget=window.turnstile.render(studentEl,{sitekey:TURNSTILE_SITE_KEY,callback:onStudentCaptchaSuccess,"expired-callback":onStudentCaptchaExpired,"error-callback":onStudentCaptchaError});
-      studentEl.dataset.turnstileRendered="1";
+    if(studentEl && !studentCaptchaWidget){
+      studentCaptchaWidget=window.turnstile.render(studentEl,{
+        sitekey:TURNSTILE_SITE_KEY,
+        callback:onStudentCaptchaSuccess,
+        "expired-callback":onStudentCaptchaExpired,
+        "error-callback":function(code){studentCaptchaToken="";message("studentLoginMessage","Cloudflare verification could not complete ("+String(code||"unknown error")+"). Refresh the page and try again.","error");}
+      });
     }
     const staffEl=document.querySelector("#staffCaptcha");
-    if(staffEl && !staffEl.querySelector("iframe") && !staffEl.dataset.turnstileRendered){
-      staffCaptchaWidget=window.turnstile.render(staffEl,{sitekey:TURNSTILE_SITE_KEY,callback:onStaffCaptchaSuccess,"expired-callback":onStaffCaptchaExpired,"error-callback":onStaffCaptchaError});
-      staffEl.dataset.turnstileRendered="1";
+    if(staffEl && !staffCaptchaWidget){
+      staffCaptchaWidget=window.turnstile.render(staffEl,{
+        sitekey:TURNSTILE_SITE_KEY,
+        callback:onStaffCaptchaSuccess,
+        "expired-callback":onStaffCaptchaExpired,
+        "error-callback":function(code){staffCaptchaToken="";message("loginMessage","Cloudflare verification could not complete ("+String(code||"unknown error")+"). Refresh the page and try again.","error");}
+      });
     }
-  }catch(err){console.warn("Turnstile initialization:",err.message);}
+  }catch(err){
+    console.error("Turnstile initialization:",err);
+  }
 }
 function openLoginPanel(){
   showPanel("loginPanel");
@@ -274,7 +284,7 @@ function resetCaptcha(kind){
  }
 }
 const $=id=>document.getElementById(id);
-$("loginTab").addEventListener("click",()=>{window.location.href="admin.html";});
+$("loginTab").addEventListener("click",()=>{showPanel("loginPanel");setTimeout(initTurnstile,0);$("loginEmail").focus();});
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
  auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
 });
