@@ -38,7 +38,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 </header>
 <nav>
 <button id="studentTab" type="button">Student Examination</button>
-<button id="loginTab" type="button" class="secondary" onclick="document.getElementById('studentPanel').classList.add('hidden');document.getElementById('loginPanel').classList.remove('hidden');">Administrator Sign-in</button>
+<button id="loginTab" type="button" class="secondary">Administrator Sign-in</button>
 <button id="teacherTab" type="button" class="secondary hidden">Teacher / Admin Dashboard</button>
 <button id="resultsTab" type="button" class="secondary hidden">Results</button>
 <button id="signOutTab" type="button" class="danger hidden">Sign out</button>
@@ -104,12 +104,45 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <section id="loginPanel" class="card hidden">
 <h2>Teacher / Administrator Sign-in</h2>
 <form id="loginForm">
-<label for="loginEmail">Teacher or administrator email</label><input id="loginEmail" type="email" required autocomplete="username">
-<label for="loginPassword">Password</label><input id="loginPassword" type="password" required autocomplete="current-password">
-<div id="staffCaptcha" class="item" aria-label="Staff CAPTCHA verification"></div>
-<button id="loginButton" class="primary">Sign in</button><p id="loginMessage" role="alert"></p>
+<label for="loginEmail">Teacher or administrator email</label>
+<input id="loginEmail" type="email" required autocomplete="username" placeholder="teacher@example.com">
+<label for="loginPassword">Password</label>
+<input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter your password">
+<div id="staffCaptcha" class="item" aria-label="Staff CAPTCHA verification">
+<p class="muted">Security verification is loading…</p>
+</div>
+<div>
+<button id="forgotPasswordButton" type="button" class="secondary">Forgot password?</button>
+</div>
+<button id="loginButton" type="submit" class="primary">Sign in</button>
+<p id="loginMessage" role="alert"></p>
 </form>
 <p class="muted">Only authenticated CHELENQO teachers and administrators can use this dashboard. Teachers can access only their assigned subjects.</p>
+</section>
+
+<section id="resetPanel" class="card hidden">
+<h2>Reset your password</h2>
+<p class="muted">Enter your CHELENQO teacher or administrator email. If the account is registered, Supabase will send a password-reset email.</p>
+<form id="forgotPasswordForm">
+<label for="resetEmail">Email address</label>
+<input id="resetEmail" type="email" required autocomplete="email" placeholder="teacher@example.com">
+<button id="sendResetButton" type="submit" class="primary">Send reset email</button>
+<button id="backToLoginButton" type="button" class="secondary">Back to sign in</button>
+<p id="resetMessage" role="alert"></p>
+</form>
+</section>
+
+<section id="newPasswordPanel" class="card hidden">
+<h2>Choose a new password</h2>
+<p class="muted">Enter a new password of at least 10 characters.</p>
+<form id="newPasswordForm">
+<label for="newPassword">New password</label>
+<input id="newPassword" type="password" minlength="10" required autocomplete="new-password" placeholder="At least 10 characters">
+<label for="confirmNewPassword">Confirm new password</label>
+<input id="confirmNewPassword" type="password" minlength="10" required autocomplete="new-password" placeholder="Enter the password again">
+<button id="saveNewPasswordButton" type="submit" class="primary">Save new password</button>
+<p id="newPasswordMessage" role="alert"></p>
+</form>
 </section>
 
 <section id="teacherPanel" class="card hidden">
@@ -241,7 +274,14 @@ function onStaffCaptchaSuccess(token){staffCaptchaToken=token||"";}
 function onStaffCaptchaExpired(){staffCaptchaToken="";}
 function onStaffCaptchaError(){staffCaptchaToken="";}
 function initTurnstile(){
-  if(!window.turnstile)return;
+  const studentEl=document.querySelector("#studentCaptcha");
+  const staffEl=document.querySelector("#staffCaptcha");
+
+  if(!window.turnstile){
+    if(studentEl)studentEl.innerHTML='<p class="muted">Security verification is unavailable. Check your internet connection and refresh the page.</p>';
+    if(staffEl)staffEl.innerHTML='<p class="muted">Security verification is unavailable. Check your internet connection and refresh the page.</p>';
+    return;
+  }
   try{
     const studentEl=document.querySelector("#studentCaptcha");
     if(studentEl && !studentCaptchaWidget){
@@ -271,6 +311,14 @@ function openLoginPanel(){
   if(email)email.focus();
   setTimeout(initTurnstile,0);
 }
+
+function openResetPanel(){
+  showPanel("resetPanel");
+  const email=$("loginEmail");
+  const resetEmail=$("resetEmail");
+  if(resetEmail && email && email.value.trim())resetEmail.value=email.value.trim();
+  if(resetEmail)resetEmail.focus();
+}
 function resetCaptcha(kind){
  if(!window.turnstile)return;
  if(kind==="student"){
@@ -284,11 +332,57 @@ function resetCaptcha(kind){
  }
 }
 const $=id=>document.getElementById(id);
-$("loginTab").addEventListener("click",()=>{showPanel("loginPanel");setTimeout(initTurnstile,0);$("loginEmail").focus();});
+$("loginTab").addEventListener("click",openLoginPanel);
+$("forgotPasswordButton").addEventListener("click",openResetPanel);
+$("backToLoginButton").addEventListener("click",openLoginPanel);
+
+$("forgotPasswordForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const button=$("sendResetButton");
+ const email=$("resetEmail").value.trim();
+ if(!email){message("resetMessage","Enter your CHELENQO teacher or administrator email.");return;}
+ button.disabled=true;
+ try{
+  const redirectUrl=window.location.origin+window.location.pathname;
+  const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:redirectUrl});
+  if(error)throw error;
+  message("resetMessage","If this email belongs to a CHELENQO account, a password-reset email has been sent. Check your inbox and spam folder.","success");
+ }catch(err){
+  console.error("Password reset request:",err);
+  message("resetMessage",err.message||"Could not send the password-reset email.");
+ }finally{
+  button.disabled=false;
+ }
+});
+
+$("newPasswordForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const button=$("saveNewPasswordButton");
+ const password=$("newPassword").value;
+ const confirmation=$("confirmNewPassword").value;
+ if(password.length<10){message("newPasswordMessage","Choose a password with at least 10 characters.");return;}
+ if(password!==confirmation){message("newPasswordMessage","The two new passwords do not match.");return;}
+ button.disabled=true;
+ try{
+  const {error}=await db.auth.updateUser({password});
+  if(error)throw error;
+  message("newPasswordMessage","Password changed successfully. You can now sign in with your new password.","success");
+  $("newPasswordForm").reset();
+  setTimeout(async()=>{
+   await db.auth.signOut();
+   openLoginPanel();
+  },1500);
+ }catch(err){
+  console.error("Password update:",err);
+  message("newPasswordMessage",err.message||"Could not change your password.");
+ }finally{
+  button.disabled=false;
+ }
+});
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
  auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
 });
-const panels=["studentPanel","examPanel","resultPanel","loginPanel","teacherPanel","resultsPanel"];
+const panels=["studentPanel","examPanel","resultPanel","loginPanel","resetPanel","newPasswordPanel","teacherPanel","resultsPanel"];
 let student=null, activeExam=null, questions=[], answers={}, currentQuestion=0, attemptId=null;
 let timerHandle=null, secondsLeft=0, authenticatedAdmin=false, currentRole=null, currentSubjects=[];
 let studentMustChangePassword=false, generatedStudentAccounts=[];
@@ -536,11 +630,10 @@ $("loginForm").addEventListener("submit",async e=>{
   resetCaptcha("staff");
   if(error)throw error;
   if(!await refreshAdmin()){await db.auth.signOut();throw Error("This account is not an authorized CHELENQO teacher or administrator.");}
-  if(currentRole==="admin"){
-   window.location.href="admin.html";
-   return;
-  }
-  $("loginForm").reset();await loadSubjects();await renderExamList();showPanel("teacherPanel");
+  $("loginForm").reset();
+  await loadSubjects();
+  await renderExamList();
+  showPanel("teacherPanel");
  }catch(err){message("loginMessage",err.message||"Sign-in failed.");}
  finally{$("loginButton").disabled=false;}
 });
@@ -918,10 +1011,18 @@ $("loginTab").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.
 $("teacherTab").addEventListener("click",async()=>{if(await refreshAdmin()){await loadSubjects();await renderExamList();showPanel("teacherPanel");}else showPanel("loginPanel");});
 $("resultsTab").addEventListener("click",async()=>{showPanel("resultsPanel");await loadResultFilterOptions();});
 $("signOutTab").addEventListener("click",async()=>{await db.auth.signOut();setAdmin(false);showPanel("studentPanel");});
-db.auth.onAuthStateChange(()=>{setTimeout(async()=>{
- refreshAdmin();
- try{await restoreVerifiedStudentSession();}catch(err){console.warn("Student session restore:",err.message);}
-},0);});
+db.auth.onAuthStateChange((event,session)=>{
+ setTimeout(async()=>{
+  if(event==="PASSWORD_RECOVERY"){
+   showPanel("newPasswordPanel");
+   message("newPasswordMessage","Password recovery verified. Choose your new password.","success");
+   $("newPassword").focus();
+   return;
+  }
+  refreshAdmin();
+  try{await restoreVerifiedStudentSession();}catch(err){console.warn("Student session restore:",err.message);}
+ },0);
+});
 setAdmin(false);showPanel("studentPanel");
 (async()=>{
  await refreshAdmin();
