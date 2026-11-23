@@ -108,6 +108,33 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <button id="loginButton" class="primary">Sign in</button><p id="loginMessage" role="alert"></p>
 </form>
 <p class="muted">Only authenticated CHELENQO teachers and administrators can use this dashboard. Teachers can access only their assigned subjects.</p>
+<p><button id="forgotPasswordButton" type="button" class="secondary">Forgot password?</button></p>
+</section>
+
+<section id="forgotPasswordPanel" class="card hidden">
+<h2>Reset Teacher / Administrator Password</h2>
+<p>Enter the email address of your CHELENQO teacher or administrator account. Supabase will send a secure password-reset link.</p>
+<form id="forgotPasswordForm">
+<label for="resetEmail">Account email</label>
+<input id="resetEmail" type="email" required autocomplete="email">
+<div id="resetCaptcha" class="item" aria-label="Password reset CAPTCHA verification"></div>
+<button id="sendResetButton" class="primary">Send reset email</button>
+<button id="backToLoginButton" type="button" class="secondary">Back to sign-in</button>
+<p id="resetMessage" role="alert"></p>
+</form>
+</section>
+
+<section id="newPasswordPanel" class="card hidden">
+<h2>Set New Teacher / Administrator Password</h2>
+<p>Choose a new password for your CHELENQO teacher or administrator account.</p>
+<form id="newPasswordForm">
+<label for="newStaffPassword">New password (at least 10 characters)</label>
+<input id="newStaffPassword" type="password" minlength="10" required autocomplete="new-password">
+<label for="confirmStaffPassword">Confirm new password</label>
+<input id="confirmStaffPassword" type="password" minlength="10" required autocomplete="new-password">
+<button id="saveNewStaffPasswordButton" class="primary">Save new password</button>
+<p id="newPasswordMessage" role="alert"></p>
+</form>
 </section>
 
 <section id="teacherPanel" class="card hidden">
@@ -223,7 +250,8 @@ const SUPABASE_URL="https://yqwbdpsbtugunmtbvito.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
 const REQUIRED_SCHOOL_ID="CHELENQO";
 const TURNSTILE_SITE_KEY="0x4AAAAAAGBRdu8NmYgzAWNN";
-let studentCaptchaWidget=null,staffCaptchaWidget=null,studentCaptchaToken="",staffCaptchaToken="";
+let studentCaptchaWidget=null,staffCaptchaWidget=null,resetCaptchaWidget=null;
+let studentCaptchaToken="",staffCaptchaToken="",resetCaptchaToken="";
 function initTurnstile(){
  if(!window.turnstile){setTimeout(initTurnstile,250);return;}
  if(!$("studentPanel").classList.contains("hidden")&&studentCaptchaWidget===null){
@@ -232,10 +260,14 @@ function initTurnstile(){
  if(!$("loginPanel").classList.contains("hidden")&&staffCaptchaWidget===null){
   staffCaptchaWidget=window.turnstile.render("#staffCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>staffCaptchaToken=t,"expired-callback":()=>staffCaptchaToken="","error-callback":()=>staffCaptchaToken=""});
  }
+ if(!$("forgotPasswordPanel").classList.contains("hidden")&&resetCaptchaWidget===null){
+  resetCaptchaWidget=window.turnstile.render("#resetCaptcha",{sitekey:TURNSTILE_SITE_KEY,callback:t=>resetCaptchaToken=t,"expired-callback":()=>resetCaptchaToken="","error-callback":()=>resetCaptchaToken=""});
+ }
 }
 function resetCaptcha(kind){
  if(!window.turnstile)return;
  if(kind==="student"){studentCaptchaToken="";if(studentCaptchaWidget!==null)window.turnstile.reset(studentCaptchaWidget);}
+ else if(kind==="reset"){resetCaptchaToken="";if(resetCaptchaWidget!==null)window.turnstile.reset(resetCaptchaWidget);}
  else{staffCaptchaToken="";if(staffCaptchaWidget!==null)window.turnstile.reset(staffCaptchaWidget);}
 }
 document.addEventListener("DOMContentLoaded",initTurnstile);
@@ -244,7 +276,7 @@ $("loginTab").addEventListener("click",()=>{$("studentPanel").classList.add("hid
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
  auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
 });
-const panels=["studentPanel","examPanel","resultPanel","loginPanel","teacherPanel","resultsPanel"];
+const panels=["studentPanel","examPanel","resultPanel","loginPanel","forgotPasswordPanel","newPasswordPanel","teacherPanel","resultsPanel"];
 let student=null, activeExam=null, questions=[], answers={}, currentQuestion=0, attemptId=null;
 let timerHandle=null, secondsLeft=0, authenticatedAdmin=false, currentRole=null, currentSubjects=[];
 let studentMustChangePassword=false, generatedStudentAccounts=[];
@@ -786,17 +818,92 @@ $("clearResultFiltersButton").addEventListener("click",async()=>{
  $("resultGrade").value="";$("resultStream").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';
  $("resultsSummary").textContent="";$("resultsList").textContent="";message("resultsMessage","Filters cleared.","muted");
 });
+function recoveryRedirectUrl(){
+ return window.location.origin+window.location.pathname;
+}
+function showStaffLogin(){
+ showPanel("loginPanel");
+ initTurnstile();
+}
+$("forgotPasswordButton").addEventListener("click",()=>{
+ $("resetEmail").value=$("loginEmail").value.trim();
+ message("resetMessage","","muted");
+ showPanel("forgotPasswordPanel");
+ initTurnstile();
+});
+$("backToLoginButton").addEventListener("click",showStaffLogin);
+
+$("forgotPasswordForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const btn=$("sendResetButton");btn.disabled=true;
+ try{
+  if(!resetCaptchaToken)throw Error("Complete the CAPTCHA verification before requesting a password reset.");
+  const email=$("resetEmail").value.trim();
+  if(!email)throw Error("Enter your teacher or administrator email address.");
+  const {error}=await db.auth.resetPasswordForEmail(email,{
+   redirectTo:recoveryRedirectUrl(),
+   captchaToken:resetCaptchaToken
+  });
+  resetCaptcha("reset");
+  if(error)throw error;
+  message("resetMessage","If that email belongs to a CHELENQO teacher or administrator account, a password-reset link has been sent. Check your email and open the link on this website.","success");
+ }catch(err){
+  message("resetMessage",err.message||"Could not send the password-reset email.");
+ }finally{
+  btn.disabled=false;
+ }
+});
+
+$("newPasswordForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const btn=$("saveNewStaffPasswordButton");btn.disabled=true;
+ try{
+  const password=$("newStaffPassword").value;
+  const confirmPassword=$("confirmStaffPassword").value;
+  if(password.length<10)throw Error("Password must be at least 10 characters.");
+  if(password!==confirmPassword)throw Error("The two passwords do not match.");
+  const {data:{user},error:userError}=await db.auth.getUser();
+  if(userError)throw userError;
+  if(!user)throw Error("This password-reset link is no longer valid. Request a new reset link.");
+  const {data:profile,error:profileError}=await db.from("profiles").select("role,school_id").eq("id",user.id).maybeSingle();
+  if(profileError)throw profileError;
+  if(!profile||!["admin","teacher"].includes(profile.role)||profile.school_id!==REQUIRED_SCHOOL_ID){
+   await db.auth.signOut();
+   throw Error("This account is not an authorized CHELENQO teacher or administrator.");
+  }
+  const {error}=await db.auth.updateUser({password});
+  if(error)throw error;
+  await db.auth.signOut();
+  $("newPasswordForm").reset();
+  message("newPasswordMessage","Your password has been changed successfully. Please sign in with your new password.","success");
+  setTimeout(()=>showStaffLogin(),800);
+ }catch(err){
+  message("newPasswordMessage",err.message||"Could not change the password.");
+ }finally{
+  btn.disabled=false;
+ }
+});
+
 $("studentTab").addEventListener("click",()=>showPanel("studentPanel"));
 // Administrator Sign-in click handler is registered before Supabase initialization above.
 $("teacherTab").addEventListener("click",async()=>{if(await refreshAdmin()){await loadSubjects();await renderExamList();showPanel("teacherPanel");}else showPanel("loginPanel");});
 $("resultsTab").addEventListener("click",async()=>{showPanel("resultsPanel");await loadResultFilterOptions();});
 $("signOutTab").addEventListener("click",async()=>{await db.auth.signOut();setAdmin(false);showPanel("studentPanel");});
-db.auth.onAuthStateChange(()=>{setTimeout(async()=>{
+db.auth.onAuthStateChange((event)=>{setTimeout(async()=>{
+ if(event==="PASSWORD_RECOVERY"){
+  setAdmin(false);
+  showPanel("newPasswordPanel");
+  return;
+ }
  refreshAdmin();
  try{await restoreVerifiedStudentSession();}catch(err){console.warn("Student session restore:",err.message);}
 },0);});
-setAdmin(false);showPanel("studentPanel");
+setAdmin(false);
+const recoveryInUrl=window.location.hash.includes("type=recovery");
+if(recoveryInUrl)showPanel("newPasswordPanel");
+else showPanel("studentPanel");
 (async()=>{
+ if(recoveryInUrl)return;
  await refreshAdmin();
  try{await restoreVerifiedStudentSession();}catch(err){message("studentLoginMessage",err.message||"Could not restore student session.");}
 })();
