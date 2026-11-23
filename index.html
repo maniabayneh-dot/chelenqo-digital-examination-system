@@ -38,7 +38,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 </header>
 <nav>
 <button id="studentTab" type="button">Student Examination</button>
-<button id="loginTab" type="button" class="secondary">Administrator Sign-in</button>
+<button id="loginTab" type="button" class="secondary" onclick="openLoginPanel()">Administrator Sign-in</button>
 <button id="teacherTab" type="button" class="secondary hidden">Teacher / Admin Dashboard</button>
 <button id="resultsTab" type="button" class="secondary hidden">Results</button>
 <button id="signOutTab" type="button" class="danger hidden">Sign out</button>
@@ -284,7 +284,6 @@ function initTurnstile(){
     return;
   }
   try{
-    const studentEl=document.querySelector("#studentCaptcha");
     if(studentEl && !studentCaptchaWidget){
       studentCaptchaWidget=window.turnstile.render(studentEl,{
         sitekey:TURNSTILE_SITE_KEY,
@@ -293,7 +292,6 @@ function initTurnstile(){
         "error-callback":function(code){studentCaptchaToken="";message("studentLoginMessage","Cloudflare verification could not complete ("+String(code||"unknown error")+"). Refresh the page and try again.","error");}
       });
     }
-    const staffEl=document.querySelector("#staffCaptcha");
     if(staffEl && !staffCaptchaWidget){
       staffCaptchaWidget=window.turnstile.render(staffEl,{
         sitekey:TURNSTILE_SITE_KEY,
@@ -311,6 +309,9 @@ function openLoginPanel(){
   const email=$("loginEmail");
   if(email)email.focus();
   setTimeout(initTurnstile,0);
+  setTimeout(function(){
+    if(!staffCaptchaWidget && window.turnstile) initTurnstile();
+  },1000);
 }
 
 function openResetPanel(){
@@ -626,8 +627,15 @@ $("studentLogoutButton").addEventListener("click",async()=>{
 $("loginForm").addEventListener("submit",async e=>{
  e.preventDefault();$("loginButton").disabled=true;
  try{
-  if(!staffCaptchaToken)throw Error("Complete the CAPTCHA verification before staff sign-in.");
-  const {error}=await db.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value,options:{captchaToken:staffCaptchaToken}});
+  if(!staffCaptchaToken){
+   initTurnstile();
+   throw Error("Complete the Cloudflare security verification before staff sign-in. If the verification box is missing or shows an error, the Turnstile sitekey/domain configuration must be fixed.");
+  }
+  const {error}=await db.auth.signInWithPassword({
+   email:$("loginEmail").value.trim(),
+   password:$("loginPassword").value,
+   options:{captchaToken:staffCaptchaToken}
+  });
   resetCaptcha("staff");
   if(error)throw error;
   if(!await refreshAdmin()){await db.auth.signOut();throw Error("This account is not an authorized CHELENQO teacher or administrator.");}
