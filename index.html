@@ -277,38 +277,52 @@ function onStaffCaptchaError(){staffCaptchaToken="";}
 function initTurnstile(){
   const studentEl=document.querySelector("#studentCaptcha");
   const staffEl=document.querySelector("#staffCaptcha");
+  const studentVisible=$("studentPanel") && !$("studentPanel").classList.contains("hidden");
+  const staffVisible=$("loginPanel") && !$("loginPanel").classList.contains("hidden");
 
   if(!window.turnstile){
-    if(studentEl)studentEl.innerHTML='<p class="muted">Security verification is unavailable. Check your internet connection and refresh the page.</p>';
-    if(staffEl)staffEl.innerHTML='<p class="muted">Security verification is unavailable. Check your internet connection and refresh the page.</p>';
+    if(studentVisible && studentEl)studentEl.innerHTML='<p class="muted">Security verification is unavailable. Check your internet connection and refresh the page.</p>';
+    if(staffVisible && staffEl)staffEl.innerHTML='<p class="muted">Security verification is unavailable. Check your internet connection and refresh the page.</p>';
     return;
   }
   try{
-    if(studentEl && !studentCaptchaWidget){
+    // Do not render Turnstile inside a hidden panel. Cloudflare can fail to
+    // initialize a widget whose container is display:none. Render it only
+    // after the corresponding login panel is visible.
+    if(studentVisible && studentEl && !studentCaptchaWidget){
       studentCaptchaWidget=window.turnstile.render(studentEl,{
         sitekey:TURNSTILE_SITE_KEY,
         callback:onStudentCaptchaSuccess,
         "expired-callback":onStudentCaptchaExpired,
-        "error-callback":function(code){studentCaptchaToken="";message("studentLoginMessage","Cloudflare verification could not complete ("+String(code||"unknown error")+"). Refresh the page and try again.","error");}
+        "error-callback":function(code){
+          studentCaptchaToken="";
+          message("studentLoginMessage","Cloudflare verification could not complete ("+String(code||"unknown error")+"). Refresh the page and try again.","error");
+        }
       });
     }
-    if(staffEl && !staffCaptchaWidget){
+    if(staffVisible && staffEl && !staffCaptchaWidget){
       staffCaptchaWidget=window.turnstile.render(staffEl,{
         sitekey:TURNSTILE_SITE_KEY,
         callback:onStaffCaptchaSuccess,
         "expired-callback":onStaffCaptchaExpired,
-        "error-callback":function(code){staffCaptchaToken="";message("loginMessage","Cloudflare verification could not complete ("+String(code||"unknown error")+"). Refresh the page and try again.","error");}
+        "error-callback":function(code){
+          staffCaptchaToken="";
+          message("loginMessage","Cloudflare verification could not complete ("+String(code||"unknown error")+"). Check that this site's Turnstile key allows the GitHub Pages domain.","error");
+        }
       });
     }
   }catch(err){
     console.error("Turnstile initialization:",err);
+    if(staffVisible)message("loginMessage","Security verification could not be initialized. Refresh the page and try again.","error");
   }
 }
 function openLoginPanel(){
   showPanel("loginPanel");
   const email=$("loginEmail");
   if(email)email.focus();
-  setTimeout(initTurnstile,0);
+  // The staff CAPTCHA is intentionally rendered only after the login panel
+  // becomes visible.
+  setTimeout(initTurnstile,50);
   setTimeout(function(){
     if(!staffCaptchaWidget && window.turnstile) initTurnstile();
   },1000);
@@ -637,7 +651,14 @@ $("loginForm").addEventListener("submit",async e=>{
    options:{captchaToken:staffCaptchaToken}
   });
   resetCaptcha("staff");
-  if(error)throw error;
+  if(error){
+   const code=String(error.code||"");
+   const msg=String(error.message||"");
+   if(code.includes("captcha")||msg.toLowerCase().includes("captcha")||msg.toLowerCase().includes("turnstile")){
+    throw Error("Cloudflare verification was rejected. Refresh the page and complete the verification again. If it keeps failing, the Turnstile sitekey must be configured for maniabayneh-dot.github.io in Cloudflare.");
+   }
+   throw error;
+  }
   if(!await refreshAdmin()){await db.auth.signOut();throw Error("This account is not an authorized CHELENQO teacher or administrator.");}
   $("loginForm").reset();
   await loadSubjects();
@@ -1033,7 +1054,7 @@ db.auth.onAuthStateChange((event,session)=>{
  },0);
 });
 setAdmin(false);showPanel("studentPanel");
-window.addEventListener("load",()=>setTimeout(initTurnstile,50));
+window.addEventListener("load",()=>setTimeout(initTurnstile,100));
 (async()=>{
  await refreshAdmin();
  try{await restoreVerifiedStudentSession();}catch(err){message("studentLoginMessage",err.message||"Could not restore student session.");}
