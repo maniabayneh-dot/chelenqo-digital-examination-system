@@ -28,7 +28,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.turnstileLoaded=true;window.dispatchEvent(new Event('turnstileloaded'))"></script>
 </head>
 <body>
 <header>
@@ -267,7 +267,7 @@ const SUPABASE_PUBLISHABLE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
 const REQUIRED_SCHOOL_ID="CHELENQO";
 const TURNSTILE_SITE_KEY="0x4AAAAAAGBRdu8NmYgzAWNN";
 const AUTH_REDIRECT_URL="https://maniabayneh-dot.github.io/chelenqo-digital-examination-system/";
-let studentCaptchaWidget=null,staffCaptchaWidget=null,studentCaptchaToken="",staffCaptchaToken="";
+let studentCaptchaWidget=null,staffCaptchaWidget=null,studentCaptchaToken="",staffCaptchaToken="",turnstileLoaded=false;
 function onStudentCaptchaSuccess(token){studentCaptchaToken=token||"";}
 function onStudentCaptchaExpired(){studentCaptchaToken="";}
 function onStudentCaptchaError(){studentCaptchaToken="";}
@@ -281,8 +281,14 @@ function initTurnstile(){
   const staffVisible=$("loginPanel") && !$("loginPanel").classList.contains("hidden");
 
   if(!window.turnstile){
-    if(studentVisible && studentEl)studentEl.innerHTML='<p class="muted">Security verification is unavailable. Check your internet connection and refresh the page.</p>';
-    if(staffVisible && staffEl)staffEl.innerHTML='<p class="muted">Security verification is unavailable. Check your internet connection and refresh the page.</p>';
+    if(!studentVisible && !staffVisible)return;
+    if(!turnstileLoaded){
+      if(studentVisible && studentEl)studentEl.innerHTML='<p class="muted">Security verification is loading…</p>';
+      if(staffVisible && staffEl)staffEl.innerHTML='<p class="muted">Security verification is loading…</p>';
+      return;
+    }
+    if(studentVisible && studentEl)studentEl.innerHTML='<p class="muted">Security verification could not load. Refresh the page and try again.</p>';
+    if(staffVisible && staffEl)staffEl.innerHTML='<p class="muted">Security verification could not load. Refresh the page and try again.</p>';
     return;
   }
   try{
@@ -1054,7 +1060,11 @@ db.auth.onAuthStateChange((event,session)=>{
  },0);
 });
 setAdmin(false);showPanel("studentPanel");
-window.addEventListener("load",()=>setTimeout(initTurnstile,100));
+window.addEventListener("turnstileloaded",()=>{turnstileLoaded=true;initTurnstile();});
+window.addEventListener("load",()=>{
+  if(window.turnstile){turnstileLoaded=true;initTurnstile();}
+  else setTimeout(initTurnstile,500);
+});
 (async()=>{
  await refreshAdmin();
  try{await restoreVerifiedStudentSession();}catch(err){message("studentLoginMessage",err.message||"Could not restore student session.");}
