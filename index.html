@@ -109,7 +109,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <label for="loginPassword">Password</label>
 <input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter your password">
 <div id="staffCaptcha" class="item" aria-label="Staff CAPTCHA verification">
-<p class="muted">Security verification is loading…</p>
+<p class="muted">Security verification is loading. The verification box will appear here.</p>
 </div>
 <div>
 <button id="forgotPasswordButton" type="button" class="secondary">Forgot password?</button>
@@ -274,6 +274,34 @@ function onStudentCaptchaError(){studentCaptchaToken="";}
 function onStaffCaptchaSuccess(token){staffCaptchaToken=token||"";}
 function onStaffCaptchaExpired(){staffCaptchaToken="";}
 function onStaffCaptchaError(){staffCaptchaToken="";}
+function turnstileStatusText(kind){
+  return kind==="student"
+    ?"Security verification is loading. If it does not appear within a few seconds, tap the browser refresh button."
+    :"Security verification is loading. If it does not appear within a few seconds, refresh this page.";
+}
+function renderTurnstile(kind,el){
+  if(!el||!window.turnstile)return null;
+  const options={
+    sitekey:TURNSTILE_SITE_KEY,
+    theme:"light",
+    size:"normal",
+    appearance:"always",
+    retry:"auto",
+    "retry-interval":8000,
+    callback:kind==="student"?onStudentCaptchaSuccess:onStaffCaptchaSuccess,
+    "expired-callback":kind==="student"?onStudentCaptchaExpired:onStaffCaptchaExpired,
+    "error-callback":function(code){
+      if(kind==="student")studentCaptchaToken="";else staffCaptchaToken="";
+      const target=kind==="student"?"studentLoginMessage":"loginMessage";
+      message(target,"Cloudflare verification could not complete ("+String(code||"unknown error")+"). Refresh the page. If the box remains blank, the Turnstile sitekey must allow maniabayneh-dot.github.io.","error");
+    }
+  };
+  try{return window.turnstile.render(el,options);}catch(err){
+    console.error("Turnstile render error:",err);
+    el.innerHTML='<p class="error">Security verification could not be displayed. Please refresh this page.</p>';
+    return null;
+  }
+}
 function initTurnstile(){
   const studentEl=document.querySelector("#studentCaptcha");
   const staffEl=document.querySelector("#staffCaptcha");
@@ -283,8 +311,8 @@ function initTurnstile(){
   if(!window.turnstile){
     if(!studentVisible && !staffVisible)return;
     if(!turnstileLoaded){
-      if(studentVisible && studentEl)studentEl.innerHTML='<p class="muted">Security verification is loading…</p>';
-      if(staffVisible && staffEl)staffEl.innerHTML='<p class="muted">Security verification is loading…</p>';
+      if(studentVisible && studentEl)studentEl.innerHTML='<p class="muted">'+turnstileStatusText("student")+'</p>';
+      if(staffVisible && staffEl)staffEl.innerHTML='<p class="muted">'+turnstileStatusText("staff")+'</p>';
       return;
     }
     if(studentVisible && studentEl)studentEl.innerHTML='<p class="muted">Security verification could not load. Refresh the page and try again.</p>';
@@ -296,26 +324,10 @@ function initTurnstile(){
     // initialize a widget whose container is display:none. Render it only
     // after the corresponding login panel is visible.
     if(studentVisible && studentEl && !studentCaptchaWidget){
-      studentCaptchaWidget=window.turnstile.render(studentEl,{
-        sitekey:TURNSTILE_SITE_KEY,
-        callback:onStudentCaptchaSuccess,
-        "expired-callback":onStudentCaptchaExpired,
-        "error-callback":function(code){
-          studentCaptchaToken="";
-          message("studentLoginMessage","Cloudflare verification could not complete ("+String(code||"unknown error")+"). Refresh the page and try again.","error");
-        }
-      });
+      studentCaptchaWidget=renderTurnstile("student",studentEl);
     }
     if(staffVisible && staffEl && !staffCaptchaWidget){
-      staffCaptchaWidget=window.turnstile.render(staffEl,{
-        sitekey:TURNSTILE_SITE_KEY,
-        callback:onStaffCaptchaSuccess,
-        "expired-callback":onStaffCaptchaExpired,
-        "error-callback":function(code){
-          staffCaptchaToken="";
-          message("loginMessage","Cloudflare verification could not complete ("+String(code||"unknown error")+"). Check that this site's Turnstile key allows the GitHub Pages domain.","error");
-        }
-      });
+      staffCaptchaWidget=renderTurnstile("staff",staffEl);
     }
   }catch(err){
     console.error("Turnstile initialization:",err);
