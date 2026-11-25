@@ -20,6 +20,9 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 .notice{padding:12px;border-radius:8px;background:#fff7ed;color:#9a3412;line-height:1.5}
 .success{padding:12px;border-radius:8px;background:#f0fdf4;color:#166534;line-height:1.5}
 .error{color:#b91c1c;line-height:1.5}.muted{color:#64748b;font-size:14px}.item{padding:12px;border:1px solid #e2e8f0;border-radius:8px;margin:9px 0}
+.captcha-box{padding:8px 0;margin:8px 0;min-height:78px}
+.captcha-status{padding:10px;border:1px dashed #cbd5e1;border-radius:7px;color:#64748b;background:#f8fafc;font-size:14px}
+.captcha-retry{background:#475569;font-size:14px;padding:9px 12px;margin-top:8px}
 .option{display:block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:7px;padding:13px;margin:10px 0;cursor:pointer;font-weight:normal}
 .option input{display:inline-block;width:auto;margin:0 10px 0 0}#timer{font-size:20px;color:var(--red)}
 .question{font-size:19px;font-weight:bold;margin:20px 0}footer{text-align:center;padding:20px;color:#64748b}
@@ -28,7 +31,13 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="window.turnstileLoaded=true;window.dispatchEvent(new Event('turnstileloaded'))"></script>
+<script>
+window.onTurnstileLoad=function(){
+  window.turnstileLoaded=true;
+  window.dispatchEvent(new Event("turnstileloaded"));
+};
+</script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad" async defer></script>
 </head>
 <body>
 <header>
@@ -52,7 +61,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <input id="studentIdInput" maxlength="40" required autocomplete="username" autocapitalize="characters" placeholder="CHS-09-0001">
 <label for="studentPasswordInput">Password</label>
 <input id="studentPasswordInput" type="password" required autocomplete="current-password">
-<div id="studentCaptcha" class="item" aria-label="Student CAPTCHA verification"></div>
+<div id="studentCaptcha" class="captcha-box" aria-label="Student CAPTCHA verification"></div>
 <button id="studentLoginButton" class="primary">Student sign in</button>
 <p id="studentLoginMessage" role="alert"></p>
 </form>
@@ -108,9 +117,7 @@ textarea{min-height:190px;font-family:monospace;font-size:14px}.grid{display:gri
 <input id="loginEmail" type="email" required autocomplete="username" placeholder="teacher@example.com">
 <label for="loginPassword">Password</label>
 <input id="loginPassword" type="password" required autocomplete="current-password" placeholder="Enter your password">
-<div id="staffCaptcha" class="item" aria-label="Staff CAPTCHA verification">
-<p class="muted">Security verification is loading. The verification box will appear here.</p>
-</div>
+<div id="staffCaptcha" class="captcha-box" aria-label="Staff CAPTCHA verification"></div>
 <div>
 <button id="forgotPasswordButton" type="button" class="secondary">Forgot password?</button>
 </div>
@@ -268,19 +275,61 @@ const REQUIRED_SCHOOL_ID="CHELENQO";
 const TURNSTILE_SITE_KEY="0x4AAAAAAGQysG7wwdtiwE5K";
 const AUTH_REDIRECT_URL="https://maniabayneh-dot.github.io/chelenqo-digital-examination-system/";
 let studentCaptchaWidget=null,staffCaptchaWidget=null,studentCaptchaToken="",staffCaptchaToken="",turnstileLoaded=false;
-function onStudentCaptchaSuccess(token){studentCaptchaToken=token||"";}
+
+function onStudentCaptchaSuccess(token){
+  studentCaptchaToken=token||"";
+  message("studentLoginMessage","Security verification complete. You can now sign in.","success");
+}
 function onStudentCaptchaExpired(){studentCaptchaToken="";}
-function onStudentCaptchaError(){studentCaptchaToken="";}
-function onStaffCaptchaSuccess(token){staffCaptchaToken=token||"";}
+function onStudentCaptchaError(code){
+  studentCaptchaToken="";
+  console.error("Student Turnstile error:",code);
+}
+function onStaffCaptchaSuccess(token){
+  staffCaptchaToken=token||"";
+  message("loginMessage","Security verification complete. You can now sign in.","success");
+}
 function onStaffCaptchaExpired(){staffCaptchaToken="";}
-function onStaffCaptchaError(){staffCaptchaToken="";}
+function onStaffCaptchaError(code){
+  staffCaptchaToken="";
+  console.error("Staff Turnstile error:",code);
+}
+
 function turnstileStatusText(kind){
   return kind==="student"
-    ?"Security verification is loading. If it does not appear within a few seconds, tap the browser refresh button."
-    :"Security verification is loading. If it does not appear within a few seconds, refresh this page.";
+    ?"Security verification is loading…"
+    :"Security verification is loading…";
 }
+
+function showTurnstileFailure(kind,code){
+  const target=kind==="student"?"studentCaptcha":"staffCaptcha";
+  const messageId=kind==="student"?"studentLoginMessage":"loginMessage";
+  const el=$(target);
+  if(!el)return;
+  const safeCode=String(code||"unknown");
+  el.innerHTML="";
+  const box=document.createElement("div");
+  box.className="captcha-status";
+  box.innerHTML="<b>Security verification could not load.</b><br>Turnstile error: "+safeCode;
+  const retry=document.createElement("button");
+  retry.type="button";
+  retry.className="captcha-retry";
+  retry.textContent="Retry security check";
+  retry.onclick=function(){
+    if(kind==="student")studentCaptchaWidget=null;
+    else staffCaptchaWidget=null;
+    el.innerHTML="";
+    initTurnstile();
+  };
+  box.appendChild(document.createElement("br"));
+  box.appendChild(retry);
+  el.appendChild(box);
+  message(messageId,"The security check could not start. If this continues, verify that the Turnstile sitekey allows maniabayneh-dot.github.io.","error");
+}
+
 function renderTurnstile(kind,el){
   if(!el||!window.turnstile)return null;
+
   const options={
     sitekey:TURNSTILE_SITE_KEY,
     theme:"light",
@@ -291,49 +340,45 @@ function renderTurnstile(kind,el){
     callback:kind==="student"?onStudentCaptchaSuccess:onStaffCaptchaSuccess,
     "expired-callback":kind==="student"?onStudentCaptchaExpired:onStaffCaptchaExpired,
     "error-callback":function(code){
-      if(kind==="student")studentCaptchaToken="";else staffCaptchaToken="";
-      const target=kind==="student"?"studentLoginMessage":"loginMessage";
-      message(target,"Cloudflare verification could not complete ("+String(code||"unknown error")+"). Refresh the page. If the box remains blank, the Turnstile sitekey must allow maniabayneh-dot.github.io.","error");
+      if(kind==="student")studentCaptchaToken="";
+      else staffCaptchaToken="";
+      showTurnstileFailure(kind,code);
     }
   };
-  try{return window.turnstile.render(el,options);}catch(err){
+
+  try{
+    el.innerHTML="";
+    const selector=kind==="student"?"#studentCaptcha":"#staffCaptcha";
+    return window.turnstile.render(selector,options);
+  }catch(err){
     console.error("Turnstile render error:",err);
-    el.innerHTML='<p class="error">Security verification could not be displayed. Please refresh this page.</p>';
+    showTurnstileFailure(kind,err.message||"render-error");
     return null;
   }
 }
+
 function initTurnstile(){
-  const studentEl=document.querySelector("#studentCaptcha");
-  const staffEl=document.querySelector("#staffCaptcha");
-  const studentVisible=$("studentPanel") && !$("studentPanel").classList.contains("hidden");
-  const staffVisible=$("loginPanel") && !$("loginPanel").classList.contains("hidden");
+  const studentEl=$( "studentCaptcha" );
+  const staffEl=$( "staffCaptcha" );
+  const studentVisible=$( "studentPanel" ) && !$( "studentPanel" ).classList.contains("hidden");
+  const staffVisible=$( "loginPanel" ) && !$( "loginPanel" ).classList.contains("hidden");
+
+  if(!studentVisible && !staffVisible)return;
 
   if(!window.turnstile){
-    if(!studentVisible && !staffVisible)return;
-    if(!turnstileLoaded){
-      if(studentVisible && studentEl)studentEl.innerHTML='<p class="muted">'+turnstileStatusText("student")+'</p>';
-      if(staffVisible && staffEl)staffEl.innerHTML='<p class="muted">'+turnstileStatusText("staff")+'</p>';
-      return;
-    }
-    if(studentVisible && studentEl)studentEl.innerHTML='<p class="muted">Security verification could not load. Refresh the page and try again.</p>';
-    if(staffVisible && staffEl)staffEl.innerHTML='<p class="muted">Security verification could not load. Refresh the page and try again.</p>';
+    if(studentVisible && studentEl)studentEl.innerHTML='<div class="captcha-status">'+turnstileStatusText("student")+'</div>';
+    if(staffVisible && staffEl)staffEl.innerHTML='<div class="captcha-status">'+turnstileStatusText("staff")+'</div>';
     return;
   }
-  try{
-    // Do not render Turnstile inside a hidden panel. Cloudflare can fail to
-    // initialize a widget whose container is display:none. Render it only
-    // after the corresponding login panel is visible.
-    if(studentVisible && studentEl && !studentCaptchaWidget){
-      studentCaptchaWidget=renderTurnstile("student",studentEl);
-    }
-    if(staffVisible && staffEl && !staffCaptchaWidget){
-      staffCaptchaWidget=renderTurnstile("staff",staffEl);
-    }
-  }catch(err){
-    console.error("Turnstile initialization:",err);
-    if(staffVisible)message("loginMessage","Security verification could not be initialized. Refresh the page and try again.","error");
+
+  if(studentVisible && studentEl && !studentCaptchaWidget){
+    studentCaptchaWidget=renderTurnstile("student",studentEl);
+  }
+  if(staffVisible && staffEl && !staffCaptchaWidget){
+    staffCaptchaWidget=renderTurnstile("staff",staffEl);
   }
 }
+
 function openLoginPanel(){
   showPanel("loginPanel");
   const email=$("loginEmail");
@@ -357,11 +402,9 @@ function resetCaptcha(kind){
  if(!window.turnstile)return;
  if(kind==="student"){
   studentCaptchaToken="";
-  const el=document.querySelector("#studentCaptcha");
   if(studentCaptchaWidget)window.turnstile.reset(studentCaptchaWidget);
  }else{
   staffCaptchaToken="";
-  const el=document.querySelector("#staffCaptcha");
   if(staffCaptchaWidget)window.turnstile.reset(staffCaptchaWidget);
  }
 }
