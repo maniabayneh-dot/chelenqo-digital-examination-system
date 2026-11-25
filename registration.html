@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#123c69"><title>Student Registration | CHELENQO</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2"></script>\n<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <style>
 :root{--navy:#123c69;--blue:#1769aa;--green:#15803d;--red:#b91c1c;--bg:#f1f5f9}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:#172554}
@@ -40,7 +40,7 @@ button,.link{display:inline-block;border:0;border-radius:7px;padding:12px 16px;b
 <p id="formMessage" role="status"></p>
 </form></section>
 <section class="card"><h2>Administrator</h2><p class="muted">School administrators can sign in to review and approve applications.</p>
-<form id="adminLogin"><label for="email">Administrator email</label><input id="email" type="email" required autocomplete="username"><label for="password">Password</label><input id="password" type="password" required autocomplete="current-password"><button class="secondary">Administrator sign in</button><button class="danger hidden" id="signOut" type="button">Sign out</button><p id="adminMessage" role="alert"></p></form>
+<form id="adminLogin"><label for="email">Administrator email</label><input id="email" type="email" required autocomplete="username"><label for="password">Password</label><input id="password" type="password" required autocomplete="current-password"><div id="adminCaptcha" class="cf-turnstile" aria-label="Administrator CAPTCHA verification"></div><p class="muted">Complete the Cloudflare security check before signing in.</p><button class="secondary">Administrator sign in</button><button class="danger hidden" id="signOut" type="button">Sign out</button><p id="adminMessage" role="alert"></p></form>
 </section>
 <section class="card hidden" id="dashboard"><h2>Registration Applications</h2><div class="grid"><div><label for="filter">Filter status</label><select id="filter"><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="all">All applications</option></select></div><div><label for="search">Search name</label><input id="search" placeholder="Type student name"></div></div><button id="refresh" type="button">Refresh applications</button><div id="applicationsList"></div></section>
 </main><footer>© 2026 Chelenqo Secondary School · <a href="./index.html">Return to examination system</a></footer>
@@ -48,7 +48,7 @@ button,.link{display:inline-block;border:0;border-radius:7px;padding:12px 16px;b
 "use strict";
 const SUPABASE_URL="https://yqwbdpsbtugunmtbvito.supabase.co";
 const SUPABASE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
-const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);\nconst TURNSTILE_SITE_KEY="0x4AAAAAAGQysG7wwdtiwE5K";\nlet adminCaptchaToken="";\nfunction renderAdminCaptcha(){if(!window.turnstile){setTimeout(renderAdminCaptcha,500);return;}const el=$("adminCaptcha");if(el.dataset.rendered)return;el.dataset.rendered="1";window.turnstile.render(el,{sitekey:TURNSTILE_SITE_KEY,theme:"light",callback:token=>{adminCaptchaToken=token;}, "expired-callback":()=>{adminCaptchaToken="";},"error-callback":()=>{adminCaptchaToken="";say("adminMessage","Cloudflare security check failed. Refresh this page and try again.");}});}\nwindow.addEventListener("load",renderAdminCaptcha);
 const $=id=>document.getElementById(id);
 const say=(id,t,ok=false)=>{$(id).textContent=t;$(id).className=ok?"success":"error";};
 $("grade").addEventListener("change",()=>{
