@@ -47,7 +47,7 @@ window.onTurnstileLoad=function(){
 </header>
 <nav>
 <button id="studentTab" type="button">Student Examination</button>
-<button id="loginTab" type="button" class="secondary" onclick="openLoginPanel()">Administrator Sign-in</button>
+<button id="loginTab" type="button" class="secondary" onclick="(function(){var p=["studentPanel","examPanel","resultPanel","loginPanel","resetPanel","newPasswordPanel","teacherPanel","resultsPanel"];p.forEach(function(id){var e=document.getElementById(id);if(e)e.classList.toggle("hidden",id!=="loginPanel")});var e=document.getElementById("loginEmail");if(e)e.focus();setTimeout(function(){if(typeof openLoginPanel==="function")openLoginPanel()},50)})()">Administrator Sign-in</button>
 <button id="teacherTab" type="button" class="secondary hidden">Teacher / Admin Dashboard</button>
 <button id="resultsTab" type="button" class="secondary hidden">Results</button>
 <button id="signOutTab" type="button" class="danger hidden">Sign out</button>
