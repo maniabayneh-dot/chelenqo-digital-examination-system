@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#123c69"><title>Student Registration | CHELENQO</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2"></script>
+<style>
+:root{--navy:#123c69;--blue:#1769aa;--green:#15803d;--red:#b91c1c;--bg:#f1f5f9}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:#172554}
+header{background:var(--navy);color:white;text-align:center;padding:22px 12px}main{max-width:980px;margin:22px auto;padding:0 14px}
+.card{background:white;padding:20px;border-radius:12px;box-shadow:0 3px 12px #0001;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+label{display:block;font-weight:600;margin:12px 0 5px}input,select,textarea{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px}
+button,.link{display:inline-block;border:0;border-radius:7px;padding:12px 16px;background:var(--blue);color:white;font-size:15px;text-decoration:none;cursor:pointer;margin:5px 3px 5px 0}
+.primary{background:var(--green)}.danger{background:var(--red)}.secondary{background:#475569}
+.notice{background:#fff7ed;color:#9a3412;padding:12px;border-radius:8px;line-height:1.5}.success{background:#f0fdf4;color:#166534;padding:12px;border-radius:8px}.muted{color:#64748b;font-size:14px}.item{border:1px solid #e2e8f0;border-radius:8px;padding:13px;margin:10px 0}.hidden{display:none!important}
+.status{font-weight:bold;text-transform:capitalize}.error{color:#b91c1c}footer{text-align:center;padding:20px;color:#64748b}
+</style></head>
+<body>
+<header><h1>CHELENQO SECONDARY SCHOOL</h1><p>Student Online Registration | Grades 9–12</p></header>
+<main>
+<section class="card" id="application">
+<h2>New Student Registration</h2>
+<p class="notice">Complete this form carefully. Submitting an application does not automatically create an examination account. The school administration will review your application.</p>
+<form id="registrationForm">
+<div class="grid">
+<div><label for="fullName">Student full name *</label><input id="fullName" maxlength="120" required autocomplete="name"></div>
+<div><label for="dob">Date of birth</label><input id="dob" type="date"></div>
+<div><label for="sex">Sex</label><select id="sex"><option value="">Select</option><option>Female</option><option>Male</option><option>Prefer not to say</option></select></div>
+<div><label for="grade">Grade *</label><select id="grade" required><option value="">Select grade</option><option value="9">Grade 9</option><option value="10">Grade 10</option><option value="11">Grade 11</option><option value="12">Grade 12</option></select></div>
+<div><label for="stream">Stream *</label><select id="stream" required><option value="">Select grade first</option></select></div>
+<div><label for="section">Requested section *</label><input id="section" maxlength="20" required placeholder="A, B, C..."></div>
+<div><label for="year">Academic year *</label><input id="year" maxlength="20" required placeholder="2019 E.C."></div>
+<div><label for="guardian">Parent/guardian name</label><input id="guardian" maxlength="120"></div>
+<div><label for="phone">Parent/guardian phone</label><input id="phone" type="tel" maxlength="30" placeholder="+251..."></div>
+<div><label for="previous">Previous school</label><input id="previous" maxlength="160"></div>
+</div>
+<label for="address">Address / kebele</label><textarea id="address" rows="2" maxlength="500"></textarea>
+<button class="primary" id="submitBtn">Submit registration</button>
+<p id="formMessage" role="status"></p>
+</form></section>
+<section class="card"><h2>Administrator</h2><p class="muted">School administrators can sign in to review and approve applications.</p>
+<form id="adminLogin"><label for="email">Administrator email</label><input id="email" type="email" required autocomplete="username"><label for="password">Password</label><input id="password" type="password" required autocomplete="current-password"><button class="secondary">Administrator sign in</button><button class="danger hidden" id="signOut" type="button">Sign out</button><p id="adminMessage" role="alert"></p></form>
+</section>
+<section class="card hidden" id="dashboard"><h2>Registration Applications</h2><div class="grid"><div><label for="filter">Filter status</label><select id="filter"><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="all">All applications</option></select></div><div><label for="search">Search name</label><input id="search" placeholder="Type student name"></div></div><button id="refresh" type="button">Refresh applications</button><div id="applicationsList"></div></section>
+</main><footer>© 2026 Chelenqo Secondary School · <a href="./index.html">Return to examination system</a></footer>
+<script>
+"use strict";
+const SUPABASE_URL="https://yqwbdpsbtugunmtbvito.supabase.co";
+const SUPABASE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=id=>document.getElementById(id);
+const say=(id,t,ok=false)=>{$(id).textContent=t;$(id).className=ok?"success":"error";};
+$("grade").addEventListener("change",()=>{
+ const g=Number($("grade").value),s=$("stream");s.innerHTML="";
+ const opts=g<=10?["General"]:["Natural Science","Social Science"];
+ const first=document.createElement("option");first.value="";first.textContent="Select stream";s.append(first);
+ opts.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;s.append(o);});
+});
+$("registrationForm").addEventListener("submit",async e=>{
+ e.preventDefault();$("submitBtn").disabled=true;
+ try{
+ const grade=Number($("grade").value);
+ const payload={full_name:$("fullName").value.trim(),date_of_birth:$("dob").value||null,sex:$("sex").value||null,grade_level:grade,stream:$("stream").value,section:$("section").value.trim(),academic_year:$("year").value.trim(),guardian_name:$("guardian").value.trim()||null,guardian_phone:$("phone").value.trim()||null,previous_school:$("previous").value.trim()||null,address:$("address").value.trim()||null};
+ if(!payload.full_name||!grade||!payload.stream||!payload.section||!payload.academic_year)throw Error("Complete all required fields.");
+ const {error}=await db.from("registration_applications").insert(payload);if(error)throw error;
+ $("registrationForm").reset();$("stream").innerHTML='<option value="">Select grade first</option>';
+ say("formMessage","Your application was submitted successfully. Please contact the school for follow-up. Keep your details private.",true);
+ }catch(err){say("formMessage",err.message||"Submission failed. Please try again.");}
+ finally{$("submitBtn").disabled=false;}
+});
+async function isAdmin(){
+ const {data:{user},error:authError}=await db.auth.getUser();if(authError||!user)return false;
+ const {data,error}=await db.from("profiles").select("role").eq("id",user.id).maybeSingle();
+ if(error)throw error;return data?.role==="admin";
+}
+$("adminLogin").addEventListener("submit",async e=>{
+ e.preventDefault();
+ try{
+ const {error}=await db.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error)throw error;
+ if(!await isAdmin()){await db.auth.signOut();throw Error("This account does not have administrator access.");}
+ $("dashboard").classList.remove("hidden");$("signOut").classList.remove("hidden");say("adminMessage","Administrator signed in.",true);await loadApplications();
+ }catch(err){say("adminMessage",err.message||"Sign-in failed.");}
+});
+$("signOut").addEventListener("click",async()=>{await db.auth.signOut();$("dashboard").classList.add("hidden");$("signOut").classList.add("hidden");say("adminMessage","Signed out.",true);});
+async function loadApplications(){
+ const box=$("applicationsList");box.textContent="Loading...";
+ try{
+ if(!await isAdmin())throw Error("Administrator sign-in required.");
+ let q=db.from("registration_applications").select("*").order("created_at",{ascending:false});
+ if($("filter").value!=="all")q=q.eq("status",$("filter").value);
+ const {data,error}=await q;if(error)throw error;
+ const term=$("search").value.trim().toLowerCase();
+ const rows=(data||[]).filter(r=>r.full_name.toLowerCase().includes(term));box.innerHTML="";
+ if(!rows.length){box.textContent="No applications found.";return;}
+ rows.forEach(r=>{
+ const item=document.createElement("article");item.className="item";
+ const title=document.createElement("h3");title.textContent=r.full_name;
+ const detail=document.createElement("p");detail.textContent="Grade "+r.grade_level+" · "+r.stream+" · Section "+r.section+" · "+r.academic_year;
+ const contact=document.createElement("p");contact.textContent="Guardian: "+(r.guardian_name||"Not provided")+" · Phone: "+(r.guardian_phone||"Not provided");
+ const status=document.createElement("p");status.className="status";status.textContent="Status: "+r.status;
+ const date=document.createElement("p");date.className="muted";date.textContent="Submitted: "+new Date(r.created_at).toLocaleString();
+ item.append(title,detail,contact,status,date);
+ if(r.date_of_birth){const p=document.createElement("p");p.textContent="Date of birth: "+r.date_of_birth;item.append(p);}
+ if(r.sex){const p=document.createElement("p");p.textContent="Sex: "+r.sex;item.append(p);}
+ if(r.previous_school){const p=document.createElement("p");p.textContent="Previous school: "+r.previous_school;item.append(p);}
+ if(r.address){const p=document.createElement("p");p.textContent="Address: "+r.address;item.append(p);}
+ if(r.admin_note){const p=document.createElement("p");p.textContent="Admin note: "+r.admin_note;item.append(p);}
+ if(r.status==="pending"){
+ const approve=document.createElement("button");approve.className="primary";approve.textContent="Approve";
+ approve.onclick=()=>review(r.id,"approved");
+ const reject=document.createElement("button");reject.className="danger";reject.textContent="Reject";
+ reject.onclick=()=>review(r.id,"rejected");item.append(approve,reject);
+ }
+ box.append(item);
+ });
+ }catch(err){box.textContent=err.message||"Could not load applications.";}
+}
+async function review(id,status){
+ const note=prompt("Optional administrative note (do not enter sensitive information):")||null;
+ try{
+ if(!await isAdmin())throw Error("Administrator access required.");
+ const {data:{user}}=await db.auth.getUser();
+ const {error}=await db.from("registration_applications").update({status,admin_note:note,reviewed_by:user.id,reviewed_at:new Date().toISOString()}).eq("id",id).eq("status","pending");
+ if(error)throw error;await loadApplications();
+ }catch(err){alert(err.message||"Could not update application.");}
+}
+$("refresh").addEventListener("click",loadApplications);
+$("filter").addEventListener("change",loadApplications);
+$("search").addEventListener("input",loadApplications);
+db.auth.onAuthStateChange(()=>{setTimeout(async()=>{try{if(await isAdmin()){$("dashboard").classList.remove("hidden");$("signOut").classList.remove("hidden");await loadApplications();}}catch(e){console.warn(e);}},0);});
+</script></body></html>
