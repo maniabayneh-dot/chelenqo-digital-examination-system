@@ -23,7 +23,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Configure GitHub Pages
@@ -32,8 +32,9 @@ jobs:
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          name: github-pages
           path: .
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy GitHub Pages artifact
         id: deployment
         uses: actions/deploy-pages@v4
