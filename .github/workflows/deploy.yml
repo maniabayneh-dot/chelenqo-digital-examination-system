@@ -35,6 +35,10 @@ jobs:
           name: github-pages
           path: .
 
+      # GitHub's artifact API can briefly lag after upload; wait before deployment.
+      - name: Wait for artifact metadata
+        run: sleep 10
+
       - name: Deploy GitHub Pages artifact
         id: deployment
         uses: actions/deploy-pages@v4
