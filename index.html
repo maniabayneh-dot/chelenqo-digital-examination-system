@@ -1055,10 +1055,18 @@ async function renderExamList(){
   if(!data?.length)box.textContent="No examinations have been created.";
  }catch(err){box.textContent=err.message||"Could not load examinations.";}
 }
+function getResultGradeValue(){
+ const select=$("resultGrade");
+ const raw=String(select?.value||"").trim();
+ if(/^(9|10|11|12)$/.test(raw))return raw;
+ const text=String(select?.selectedOptions?.[0]?.textContent||"").trim();
+ const match=text.match(/\\b(9|10|11|12)\\b/);
+ return match?match[1]:"";
+}
 async function loadResultFilterOptions(){
  try{
   if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
-  const grade=$("resultGrade").value;
+  const grade=getResultGradeValue();
   let query=db.from("subjects")
    .select("id,subject_name,grade_level")
    .order("subject_name");
@@ -1079,7 +1087,7 @@ async function loadResultFilterOptions(){
  }
 }
 async function loadResultExams(){
- const grade=$("resultGrade").value;
+ const grade=getResultGradeValue();
  const subject=$("resultSubject").value;
  const select=$("resultExam");
  select.innerHTML='<option value="">All examinations</option>';
@@ -1142,7 +1150,7 @@ function buildResultRoster(rows){
 }
 async function getFilteredResultRows(){
  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
- const grade=$("resultGrade").value;
+ const grade=getResultGradeValue();
  const section=$("resultSection").value.trim();
  const stream=$("resultStream").value||null;
  const subject=$("resultSubject").value||null;
@@ -1188,7 +1196,7 @@ $("printResultsButton").addEventListener("click",async()=>{
  try{
   const rows=await getFilteredResultRows();if(!rows.length)throw Error("No results to print.");
   const {roster,subjects}=buildResultRoster(rows);
-  const grade=$("resultGrade").value,stream=$("resultStream").value||"All streams",section=$("resultSection").value.trim()||"All sections";
+  const grade=getResultGradeValue(),stream=$("resultStream").value||"All streams",section=$("resultSection").value.trim()||"All sections";
   const subjectHeaders=subjects.map(s=>"<th>"+String(s).replace(/[&<>\"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]))+"</th>").join("");
   const body=roster.map(r=>"<tr><td>"+r.rank+"</td><td>"+r.student_code+"</td><td>"+r.full_name+"</td><td>"+r.stream+"</td><td>"+r.section+"</td>"+subjects.map(s=>"<td>"+r.marks[s]+"</td>").join("")+"<td>"+r.total+"</td><td>"+r.average.toFixed(2)+"</td><td>"+r.percentage.toFixed(2)+"%</td><td>"+r.status+"</td></tr>").join("");
   const w=window.open("","_blank");if(!w)throw Error("Allow pop-ups to print the roster.");
@@ -1207,7 +1215,7 @@ $("downloadResultsXlsxButton").addEventListener("click",async()=>{
   });
   const ws=XLSX.utils.json_to_sheet(exportRows);ws["!cols"]=[{wch:8},{wch:16},{wch:26},{wch:8},{wch:20},{wch:12},...subjects.map(()=>({wch:16})),{wch:12},{wch:12},{wch:14},{wch:14}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Result Roster");
-  const grade=$("resultGrade").value,section=$("resultSection").value.trim();
+  const grade=getResultGradeValue(),section=$("resultSection").value.trim();
   XLSX.writeFile(wb,"CHELENQO-Result-Roster-Grade-"+grade+(section?"-Section-"+section.replace(/[^A-Za-z0-9_-]/g,"_"):"")+".xlsx");
   message("resultsMessage",roster.length+" student roster row(s) exported to Excel.","success");
  }catch(err){message("resultsMessage",err.message||"Could not export roster.");}
