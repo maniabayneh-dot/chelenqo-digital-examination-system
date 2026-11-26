@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b3d2e"><title>CHELENQO School App</title>
+<link rel="manifest" href="./manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f7f6;color:#17322a}.container{max-width:560px;margin:auto;padding:22px 16px 40px}.card{background:#fff;border-radius:18px;padding:22px;margin:14px 0;box-shadow:0 5px 20px #0001}h1{font-size:25px;margin:0 0 8px}h2{font-size:20px}.muted{color:#65756f;line-height:1.5}button{width:100%;border:0;border-radius:12px;padding:14px;margin:6px 0;font-size:16px;font-weight:700;background:#0b3d2e;color:#fff}button.secondary{background:#e8efec;color:#0b3d2e}input{width:100%;padding:14px;border:1px solid #ccd8d3;border-radius:10px;margin:5px 0 10px;font-size:16px}label{font-weight:700;font-size:14px;display:block;margin-top:10px}.hidden{display:none}.error{background:#fff0f0;color:#9b1c1c;padding:12px;border-radius:10px;margin:10px 0}.badge{display:inline-block;background:#e8efec;color:#0b3d2e;border-radius:99px;padding:7px 10px;font-size:13px;font-weight:700}
+</style></head>
+<body><div class="container">
+<div class="card"><h1>CHELENQO SECONDARY SCHOOL</h1><div class="muted">Digital Examination System · Grades 9–12</div></div>
+<div id="home" class="card"><h2>Welcome</h2><p class="muted">Choose your account type to continue.</p>
+<button onclick="showLogin('student')">Student Login</button><button onclick="showLogin('teacher')" class="secondary">Teacher Login</button><button onclick="showLogin('admin')" class="secondary">Administrator Login</button></div>
+<div id="login" class="card hidden"><span id="roleBadge" class="badge"></span><h2 id="loginTitle"></h2><div id="error" class="error hidden"></div>
+<label id="identityLabel">Student ID</label><input id="identity" autocomplete="username"><label>Password</label><input id="password" type="password" autocomplete="current-password">
+<button id="loginBtn" onclick="login()">Sign in</button><button class="secondary" onclick="backHome()">Back</button></div>
+<div id="dashboard" class="card hidden"><span class="badge">Verified CHELENQO account</span><h2 id="welcome"></h2><p id="details" class="muted"></p><button id="examBtn" onclick="alert('Examination module will be added next.')">Open Examinations</button><button class="secondary" onclick="logout()">Sign out</button></div>
+<div class="card"><div class="muted" style="font-size:13px">© 2026 Chelenqo Secondary School</div></div></div>
+<script>
+const SUPABASE_URL="https://yqwbdpsbtugunmtbvito.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);let currentRole=null;
+function showLogin(role){currentRole=role;home.classList.add('hidden');dashboard.classList.add('hidden');login.classList.remove('hidden');error.classList.add('hidden');loginTitle.textContent={student:'CHELENQO Student Login',teacher:'CHELENQO Teacher Login',admin:'CHELENQO Administrator Login'}[role];roleBadge.textContent=role.toUpperCase();identityLabel.textContent=role==='student'?'Student ID':'Email';identity.placeholder=role==='student'?'CHS-09-0001':'name@example.com';identity.value='';password.value=''}
+function backHome(){login.classList.add('hidden');home.classList.remove('hidden')}
+function studentEmail(id){return id.trim().toUpperCase().replaceAll('-','')+'@students.chelenqo.invalid'}
+function showError(msg){error.textContent=msg;error.classList.remove('hidden')}
+async function login(){const id=identity.value.trim(),pw=password.value;if(!id||!pw){showError('Enter your ID/email and password.');return}const email=currentRole==='student'?studentEmail(id):id;loginBtn.disabled=true;loginBtn.textContent='Signing in…';error.classList.add('hidden');
+try{const {data,error:e}=await supabaseClient.auth.signInWithPassword({email,password:pw});if(e)throw e;const {data:p,error:pe}=await supabaseClient.from('profiles').select('full_name,role,grade_level,section,stream,student_code,school_id').eq('id',data.user.id).maybeSingle();if(pe)throw pe;if(!p){await supabaseClient.auth.signOut();throw new Error('No CHELENQO profile was found for this account.')}if(p.school_id!=='CHELENQO'){await supabaseClient.auth.signOut();throw new Error('This account is not registered for CHELENQO.')}if(p.role!==currentRole){await supabaseClient.auth.signOut();throw new Error('This account does not have the selected role.')}login.classList.add('hidden');dashboard.classList.remove('hidden');welcome.textContent='Welcome, '+(p.full_name||'User');details.textContent=currentRole==='student'?'Student · Grade '+(p.grade_level||'')+' · '+(p.stream||'')+' · Section '+(p.section||''):currentRole==='teacher'?'Verified CHELENQO teacher. Your assigned subjects and results will appear here.':'Verified CHELENQO administrator. Administration tools will appear here.';examBtn.classList.toggle('hidden',currentRole!=='student')}catch(e){showError(e.message||'Sign-in failed.')}finally{loginBtn.disabled=false;loginBtn.textContent='Sign in'}}
+async function logout(){await supabaseClient.auth.signOut();dashboard.classList.add('hidden');home.classList.remove('hidden')}
+</script></body></html>
