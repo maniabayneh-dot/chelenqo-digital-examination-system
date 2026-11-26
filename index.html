@@ -477,7 +477,7 @@ const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
 });
 const panels=["studentPanel","examPanel","resultPanel","loginPanel","resetPanel","newPasswordPanel","teacherPanel","resultsPanel"];
 let student=null, activeExam=null, questions=[], answers={}, currentQuestion=0, attemptId=null;
-let timerHandle=null, secondsLeft=0, authenticatedAdmin=false, currentRole=null, currentSubjects=[];
+let timerHandle=null, secondsLeft=0, examDeadlineMs=0, autoSubmitStarted=false, authenticatedAdmin=false, currentRole=null, currentSubjects=[];
 let studentMustChangePassword=false, generatedStudentAccounts=[];
 let studentCurrentPassword="";
 
@@ -673,13 +673,29 @@ async function startExam(ex){
   const {data:aid,error:ae}=await db.rpc("start_student_exam",{p_exam_id:ex.id});
   if(ae)throw ae;
   attemptId=aid;activeExam=ex;
-  questions=q;answers={};currentQuestion=0;secondsLeft=Number(ex.duration_minutes)*60;
+  questions=q;answers={};currentQuestion=0;autoSubmitStarted=false;
+  const durationSeconds=Math.max(1,Number(ex.duration_minutes)*60);
+  examDeadlineMs=Date.now()+durationSeconds*1000;
+  secondsLeft=durationSeconds;
   $("examStudentLabel").textContent=student.full_name+" | Grade "+student.grade_level;
   showPanel("examPanel");renderQuestion();updateTimer();clearInterval(timerHandle);
-  timerHandle=setInterval(()=>{secondsLeft--;updateTimer();if(secondsLeft<=0)submitExam(true);},1000);
+  timerHandle=setInterval(()=>{
+   secondsLeft=Math.max(0,Math.ceil((examDeadlineMs-Date.now())/1000));
+   updateTimer();
+   if(secondsLeft<=0&&!autoSubmitStarted){
+    autoSubmitStarted=true;
+    clearInterval(timerHandle);
+    submitExam(true);
+   }
+  },250);
  }catch(err){alert(err.message||"Could not start examination.");}
 }
-function updateTimer(){const m=Math.floor(secondsLeft/60),s=secondsLeft%60;$("timer").textContent=String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");}
+function updateTimer(){
+ const remaining=Math.max(0,Math.ceil((examDeadlineMs-Date.now())/1000));
+ secondsLeft=examDeadlineMs?remaining:Math.max(0,secondsLeft);
+ const m=Math.floor(secondsLeft/60),s=secondsLeft%60;
+ $("timer").textContent=String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+}
 function renderQuestion(){
  const q=questions[currentQuestion];$("questionNumber").textContent=`Question ${currentQuestion+1} of ${questions.length}`;
  $("answeredCount").textContent=`Answered: ${Object.keys(answers).length}`;$("questionText").textContent=q.question_text;
@@ -698,7 +714,8 @@ $("submitBtn").addEventListener("click",()=>submitExam(false));
 async function submitExam(expired){
  if(!attemptId||!activeExam)return;
  if(!expired&&!confirm("Submit your examination now? You cannot try again."))return;
- $("submitBtn").disabled=true;clearInterval(timerHandle);message("examMessage","Submitting answers…","muted");
+ if(expired)autoSubmitStarted=true;
+ $("submitBtn").disabled=true;clearInterval(timerHandle);message("examMessage",expired?"Time is over. Submitting your answers automatically…":"Submitting answers…","muted");
  try{
   const {data:score,error}=await db.rpc("submit_exam_answers",{p_attempt_id:attemptId,p_answers:answers});if(error)throw error;
   $("resultStudent").textContent=`Student: ${student.full_name} | ${student.student_code}`;
@@ -708,9 +725,9 @@ async function submitExam(expired){
   showPanel("resultPanel");
  }catch(err){message("examMessage",err.message||"Submission failed. Keep this page open and try again.");$("submitBtn").disabled=false;}
 }
-$("returnStudent").addEventListener("click",()=>{attemptId=null;activeExam=null;$("submitBtn").disabled=false;showPanel("studentPanel");});
+$("returnStudent").addEventListener("click",()=>{attemptId=null;activeExam=null;examDeadlineMs=0;autoSubmitStarted=false;$("submitBtn").disabled=false;showPanel("studentPanel");});
 $("studentLogoutButton").addEventListener("click",async()=>{
- clearInterval(timerHandle);await db.auth.signOut();student=null;
+ clearInterval(timerHandle);examDeadlineMs=0;autoSubmitStarted=false;await db.auth.signOut();student=null;
  studentCurrentPassword="";$("studentLoginForm").reset();$("studentLoginForm").classList.remove("hidden");$("studentVerifiedPanel").classList.add("hidden");
  $("studentExamList").innerHTML="";message("studentLoginMessage","Signed out.","muted");showPanel("studentPanel");
 });
