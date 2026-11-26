@@ -20,12 +20,26 @@
 <script>
 const SUPABASE_URL="https://yqwbdpsbtugunmtbvito.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
-const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);let currentRole=null;
-function showLogin(role){currentRole=role;home.classList.add('hidden');dashboard.classList.add('hidden');login.classList.remove('hidden');error.classList.add('hidden');loginTitle.textContent={student:'CHELENQO Student Login',teacher:'CHELENQO Teacher Login',admin:'CHELENQO Administrator Login'}[role];roleBadge.textContent=role.toUpperCase();identityLabel.textContent=role==='student'?'Student ID':'Email';identity.placeholder=role==='student'?'CHS-09-0001':'name@example.com';identity.value='';password.value=''}
-function backHome(){login.classList.add('hidden');home.classList.remove('hidden')}
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const homeEl=document.getElementById('home');
+const loginEl=document.getElementById('login');
+const dashboardEl=document.getElementById('dashboard');
+const errorEl=document.getElementById('error');
+const loginTitleEl=document.getElementById('loginTitle');
+const roleBadgeEl=document.getElementById('roleBadge');
+const identityLabelEl=document.getElementById('identityLabel');
+const identityEl=document.getElementById('identity');
+const passwordEl=document.getElementById('password');
+const loginBtnEl=document.getElementById('loginBtn');
+const welcomeEl=document.getElementById('welcome');
+const detailsEl=document.getElementById('details');
+const examBtnEl=document.getElementById('examBtn');
+let currentRole=null;
+function showLogin(role){currentRole=role;homeEl.classList.add('hidden');dashboardEl.classList.add('hidden');loginEl.classList.remove('hidden');errorEl.classList.add('hidden');loginTitleEl.textContent={student:'CHELENQO Student Login',teacher:'CHELENQO Teacher Login',admin:'CHELENQO Administrator Login'}[role];roleBadgeEl.textContent=role.toUpperCase();identityLabelEl.textContent=role==='student'?'Student ID':'Email';identityEl.placeholder=role==='student'?'CHS-09-0001':'name@example.com';identityEl.value='';passwordEl.value=''}
+function backHome(){loginEl.classList.add('hidden');homeEl.classList.remove('hidden')}
 function studentEmail(id){return id.trim().toUpperCase().replaceAll('-','')+'@students.chelenqo.invalid'}
-function showError(msg){error.textContent=msg;error.classList.remove('hidden')}
-async function login(){const id=identity.value.trim(),pw=password.value;if(!id||!pw){showError('Enter your ID/email and password.');return}const email=currentRole==='student'?studentEmail(id):id;loginBtn.disabled=true;loginBtn.textContent='Signing in…';error.classList.add('hidden');
-try{const {data,error:e}=await supabaseClient.auth.signInWithPassword({email,password:pw});if(e)throw e;const {data:p,error:pe}=await supabaseClient.from('profiles').select('full_name,role,grade_level,section,stream,student_code,school_id').eq('id',data.user.id).maybeSingle();if(pe)throw pe;if(!p){await supabaseClient.auth.signOut();throw new Error('No CHELENQO profile was found for this account.')}if(p.school_id!=='CHELENQO'){await supabaseClient.auth.signOut();throw new Error('This account is not registered for CHELENQO.')}if(p.role!==currentRole){await supabaseClient.auth.signOut();throw new Error('This account does not have the selected role.')}login.classList.add('hidden');dashboard.classList.remove('hidden');welcome.textContent='Welcome, '+(p.full_name||'User');details.textContent=currentRole==='student'?'Student · Grade '+(p.grade_level||'')+' · '+(p.stream||'')+' · Section '+(p.section||''):currentRole==='teacher'?'Verified CHELENQO teacher. Your assigned subjects and results will appear here.':'Verified CHELENQO administrator. Administration tools will appear here.';examBtn.classList.toggle('hidden',currentRole!=='student')}catch(e){showError(e.message||'Sign-in failed.')}finally{loginBtn.disabled=false;loginBtn.textContent='Sign in'}}
-async function logout(){await supabaseClient.auth.signOut();dashboard.classList.add('hidden');home.classList.remove('hidden')}
+function showError(msg){errorEl.textContent=msg;errorEl.classList.remove('hidden')}
+async function login(){const id=identityEl.value.trim(),pw=passwordEl.value;if(!id||!pw){showError('Enter your ID/email and password.');return}const email=currentRole==='student'?studentEmail(id):id;loginBtnEl.disabled=true;loginBtnEl.textContent='Signing in…';errorEl.classList.add('hidden');
+try{const {data,error:e}=await supabaseClient.auth.signInWithPassword({email,password:pw});if(e)throw e;const {data:p,error:pe}=await supabaseClient.from('profiles').select('full_name,role,grade_level,section,stream,student_code,school_id').eq('id',data.user.id).maybeSingle();if(pe)throw pe;if(!p){await supabaseClient.auth.signOut();throw new Error('No CHELENQO profile was found for this account.')}if(p.school_id!=='CHELENQO'){await supabaseClient.auth.signOut();throw new Error('This account is not registered for CHELENQO.')}if(p.role!==currentRole){await supabaseClient.auth.signOut();throw new Error('This account does not have the selected role.')}loginEl.classList.add('hidden');dashboardEl.classList.remove('hidden');welcomeEl.textContent='Welcome, '+(p.full_name||'User');detailsEl.textContent=currentRole==='student'?'Student · Grade '+(p.grade_level||'')+' · '+(p.stream||'')+' · Section '+(p.section||''):currentRole==='teacher'?'Verified CHELENQO teacher. Your assigned subjects and results will appear here.':'Verified CHELENQO administrator. Administration tools will appear here.';examBtnEl.classList.toggle('hidden',currentRole!=='student')}catch(e){showError(e.message||'Sign-in failed.')}finally{loginBtnEl.disabled=false;loginBtnEl.textContent='Sign in'}}
+async function logout(){await supabaseClient.auth.signOut();dashboardEl.classList.add('hidden');homeEl.classList.remove('hidden')}
 </script></body></html>
