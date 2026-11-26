@@ -177,6 +177,22 @@ window.onTurnstileLoad=function(){
 </div>
 </div>
 <hr>
+<hr>
+<h3>Student Management</h3>
+<p class="muted">Search CHELENQO student accounts, view their class information, and issue a new temporary password when a student forgets their password.</p>
+<div class="item">
+  <div class="grid">
+    <div>
+      <label for="studentManagementSearch">Search student</label>
+      <input id="studentManagementSearch" type="search" maxlength="80" placeholder="Student ID or student name">
+    </div>
+    <div style="display:flex;align-items:end">
+      <button id="loadStudentRosterButton" type="button" class="primary">Load Student Roster</button>
+    </div>
+  </div>
+  <p id="studentManagementMessage" role="status"></p>
+  <div id="studentManagementList"></div>
+</div>
 <h3>Create an examination</h3>
 <form id="examForm">
 <div class="grid">
@@ -919,6 +935,106 @@ $("examForm").addEventListener("submit",async e=>{
   $("examForm").reset();fillSubjectOptions();await renderExamList();
  }catch(err){message("teacherMessage",err.message||"Exam creation failed.");}
 });
+async function loadStudentManagementRoster(){
+ const box=$("studentManagementList");
+ box.textContent="Loading student roster…";
+ try{
+  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
+  const {data,error}=await db.from("profiles")
+   .select("id,student_code,full_name,grade_level,stream,section,must_change_password,role")
+   .eq("school_id",REQUIRED_SCHOOL_ID)
+   .eq("role","student")
+   .order("student_code",{ascending:true});
+  if(error)throw error;
+  const term=$("studentManagementSearch").value.trim().toLowerCase();
+  const students=(data||[]).filter(s=>{
+   if(!term)return true;
+   return String(s.student_code||"").toLowerCase().includes(term)
+     ||String(s.full_name||"").toLowerCase().includes(term);
+  });
+  box.innerHTML="";
+  if(!students.length){
+   box.textContent=term?"No student accounts match your search.":"No CHELENQO student accounts found.";
+   return;
+  }
+  const table=document.createElement("table");
+  table.style.width="100%";
+  table.style.borderCollapse="collapse";
+  table.style.marginTop="12px";
+  const headers=["Student ID","Student Name","Grade","Stream","Section","Password Status","Action"];
+  const thead=document.createElement("thead");
+  const hr=document.createElement("tr");
+  headers.forEach(h=>{
+   const th=document.createElement("th");
+   th.textContent=h;
+   th.style.padding="8px";
+   th.style.borderBottom="2px solid #cbd5e1";
+   th.style.textAlign="left";
+   hr.append(th);
+  });
+  thead.append(hr);table.append(thead);
+  const tbody=document.createElement("tbody");
+  students.forEach(s=>{
+   const tr=document.createElement("tr");
+   const values=[s.student_code||"—",s.full_name||"—",s.grade_level||"—",s.stream||"General",s.section||"—",s.must_change_password?"Temporary password required":"Personal password set"];
+   values.forEach(v=>{
+    const td=document.createElement("td");
+    td.textContent=String(v);
+    td.style.padding="8px";
+    td.style.borderBottom="1px solid #e2e8f0";
+    tr.append(td);
+   });
+   const actionTd=document.createElement("td");
+   actionTd.style.padding="8px";
+   actionTd.style.borderBottom="1px solid #e2e8f0";
+   const resetBtn=document.createElement("button");
+   resetBtn.type="button";
+   resetBtn.className="danger";
+   resetBtn.textContent="Reset password";
+   resetBtn.addEventListener("click",async()=>{
+    if(!confirm("Reset the password for "+(s.full_name||s.student_code)+"?\n\nA new temporary password will be generated. The student must use it to sign in and then choose a new personal password."))return;
+    resetBtn.disabled=true;
+    message("studentManagementMessage","Resetting password for "+(s.student_code||"student")+"…","muted");
+    try{
+     if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
+     const {data,error}=await db.functions.invoke("reset-student-password",{body:{student_code:s.student_code}});
+     if(error)throw error;
+     if(!data?.success||!data?.temporary_password)throw Error(data?.error||"Password reset did not complete.");
+     const safe=document.createElement("div");
+     safe.className="success";
+     const title=document.createElement("b");
+     title.textContent="Temporary password generated";
+     const p1=document.createElement("p");
+     p1.textContent="Student: "+(data.full_name||s.full_name||"")+" ("+(data.student_code||s.student_code||"")+")";
+     const p2=document.createElement("p");
+     p2.innerHTML="<b>Temporary password:</b> <code></code>";
+     p2.querySelector("code").textContent=data.temporary_password;
+     const p3=document.createElement("p");
+     p3.className="muted";
+     p3.textContent="Give this password to the student privately. It will not be shown again after this message is cleared or the page is refreshed.";
+     const closeBtn=document.createElement("button");
+     closeBtn.type="button";
+     closeBtn.className="secondary";
+     closeBtn.textContent="Hide temporary password";
+     closeBtn.onclick=()=>safe.remove();
+     safe.append(title,p1,p2,p3,closeBtn);
+     box.prepend(safe);
+     message("studentManagementMessage","Password reset completed for "+(s.student_code||"student")+".","success");
+     s.must_change_password=true;
+     tr.children[5].textContent="Temporary password required";
+    }catch(err){
+     message("studentManagementMessage",err.message||"Could not reset the student's password.","error");
+    }finally{resetBtn.disabled=false;}
+   });
+   actionTd.append(resetBtn);tr.append(actionTd);tbody.append(tr);
+  });
+  table.append(tbody);box.append(table);
+  message("studentManagementMessage",students.length+" student account(s) shown.","muted");
+ }catch(err){
+  box.textContent="";
+  message("studentManagementMessage",err.message||"Could not load the student roster.","error");
+ }
+}
 async function renderExamList(){
  const box=$("examList");box.textContent="Loading…";
  try{
@@ -1061,6 +1177,10 @@ async function renderResults(){
   table.append(tbody);box.append(table);
  }catch(err){box.textContent="";message("resultsMessage",err.message||"Could not generate result roster.");}
 }
+$("loadStudentRosterButton").addEventListener("click",loadStudentManagementRoster);
+$("studentManagementSearch").addEventListener("keydown",e=>{
+ if(e.key==="Enter"){e.preventDefault();loadStudentManagementRoster();}
+});
 $("resultGrade").addEventListener("change",async()=>{$("resultSubject").value="";await loadResultFilterOptions();});
 $("resultSubject").addEventListener("change",async()=>{await loadResultExams();});
 $("loadFilteredResultsButton").addEventListener("click",renderResults);
