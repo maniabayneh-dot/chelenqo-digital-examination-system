@@ -1079,9 +1079,7 @@ async function previewExam(ex){
   if(error)throw error;
   if(!q?.length){questionsBox.textContent="This examination has no questions.";return;}
   const questionIds=q.map(item=>item.id);
-  const {data:keys,error:keyError}=await db.from("question_answer_keys")
-   .select("question_id,correct_option,explanation")
-   .in("question_id",questionIds);
+  const {data:keys,error:keyError}=await db.rpc("get_admin_exam_answer_keys",{p_exam_id:ex.id});
   if(keyError)throw keyError;
   const answerKeys=Object.fromEntries((keys||[]).map(k=>[k.question_id,k]));
   questionsBox.innerHTML="";
