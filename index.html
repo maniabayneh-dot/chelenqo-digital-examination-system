@@ -1074,10 +1074,16 @@ async function previewExam(ex){
   panel.classList.remove("hidden");
   panel.scrollIntoView({behavior:"smooth",block:"start"});
   const {data:q,error}=await db.from("exam_questions")
-   .select("id,question_text,options,correct_option,marks,explanation,question_order")
+   .select("id,question_text,options,marks,question_order")
    .eq("exam_id",ex.id).order("question_order");
   if(error)throw error;
   if(!q?.length){questionsBox.textContent="This examination has no questions.";return;}
+  const questionIds=q.map(item=>item.id);
+  const {data:keys,error:keyError}=await db.from("question_answer_keys")
+   .select("question_id,correct_option,explanation")
+   .in("question_id",questionIds);
+  if(keyError)throw keyError;
+  const answerKeys=Object.fromEntries((keys||[]).map(k=>[k.question_id,k]));
   questionsBox.innerHTML="";
   q.forEach((question,index)=>{
    const card=document.createElement("div");
@@ -1093,7 +1099,7 @@ async function previewExam(ex){
     row.className="option";
     row.style.cursor="default";
     row.textContent=`${String.fromCharCode(65+i)}. ${option}`;
-    if(i===Number(question.correct_option)){
+    if(i===Number(answerKeys[question.id]?.correct_option)){
      row.classList.add("success");
      row.style.fontWeight="700";
      row.textContent+= "  ✓ Correct answer";
@@ -1101,11 +1107,11 @@ async function previewExam(ex){
     options.append(row);
    });
    card.append(heading,text,options);
-   if(question.explanation){
+   if(answerKeys[question.id]?.explanation){
     const explanation=document.createElement("p");
     explanation.className="muted";
     explanation.innerHTML="<strong>Explanation:</strong> ";
-    explanation.append(document.createTextNode(String(question.explanation)));
+    explanation.append(document.createTextNode(String(answerKeys[question.id].explanation)));
     card.append(explanation);
    }
    questionsBox.append(card);
