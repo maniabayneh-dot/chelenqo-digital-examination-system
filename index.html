@@ -251,7 +251,7 @@ window.onTurnstileLoad=function(){
 <div>
 <label for="resultGrade">Grade</label>
 <select id="resultGrade">
-<option value="">Select grade</option>
+<option value="">All grades</option>
 <option value="9">Grade 9</option>
 <option value="10">Grade 10</option>
 <option value="11">Grade 11</option>
@@ -1226,8 +1226,7 @@ function buildResultRoster(rows){
 async function getFilteredResultRows(){
  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
  const grade=getResultGradeValue(),section=$("resultSection").value.trim(),stream=$("resultStream").value||null,subject=$("resultSubject").value||null,exam=$("resultExam").value||null,semester=$("resultSemester").value||null,academicYear=$("resultAcademicYear").value.trim()||null;
- if(!grade)throw Error("Select a grade.");
- const {data,error}=await db.rpc("get_admin_student_results_v2",{p_grade_level:Number(grade),p_section:section||null,p_stream:stream,p_subject_id:subject,p_exam_id:exam});if(error)throw error;
+ const {data,error}=await db.rpc("get_admin_student_results_v2",{p_grade_level:grade?Number(grade):null,p_section:section||null,p_stream:stream,p_subject_id:subject,p_exam_id:exam});if(error)throw error;
  let rows=data||[];if(semester)rows=rows.filter(r=>r.semester===semester);if(academicYear)rows=rows.filter(r=>String(r.academic_year||"").trim().toLowerCase()===academicYear.toLowerCase());return rows;
 }
 async function renderResults(){
@@ -1243,63 +1242,46 @@ $("printResultsButton").addEventListener("click",async()=>{
  try{
   const rows=await getFilteredResultRows();if(!rows.length)throw Error("No results to print.");
   const {roster,subjects}=buildResultRoster(rows);
-  const grade=getResultGradeValue(),stream=$("resultStream").value||"All streams",section=$("resultSection").value.trim()||"All sections";
-  const subjectHeaders=subjects.map(s=>"<th>"+String(s).replace(/[&<>\"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]))+"</th>").join("");
-  const body=roster.map(r=>"<tr><td>"+r.rank+"</td><td>"+r.student_code+"</td><td>"+r.full_name+"</td><td>"+r.stream+"</td><td>"+r.section+"</td>"+subjects.map(s=>"<td>"+r.marks[s]+"</td>").join("")+"<td>"+r.total+"</td><td>"+r.average.toFixed(2)+"</td><td>"+r.percentage.toFixed(2)+"%</td><td>"+r.status+"</td></tr>").join("");
+  const grade=getResultGradeValue()||"All grades",stream=$("resultStream").value||"All streams",section=$("resultSection").value.trim()||"All sections";
+  const esc=v=>String(v??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
+  const subjectHeaders=subjects.map(s=>"<th>"+esc(s)+" — Sem I</th><th>"+esc(s)+" — Sem II</th><th>"+esc(s)+" — Annual</th>").join("");
+  const body=roster.map(r=>{
+   const cells=subjects.map(s=>{
+    const x=r.subjectResults[s]||{};
+    return "<td>"+(x.semesterI==null?"—":x.semesterI.toFixed(2)+"%")+"</td><td>"+(x.semesterII==null?"—":x.semesterII.toFixed(2)+"%")+"</td><td>"+(x.annual==null?"—":x.annual.toFixed(2)+"%")+"</td>";
+   }).join("");
+   return "<tr><td>"+r.rank+"</td><td>"+esc(r.student_code||"—")+"</td><td>"+esc(r.full_name||"—")+"</td><td>"+r.grade_level+"</td><td>"+esc(r.stream)+"</td><td>"+esc(r.section||"—")+"</td>"+cells+"<td>"+r.overall.toFixed(2)+"%</td><td>"+esc(r.status)+"</td></tr>";
+  }).join("");
   const w=window.open("","_blank");if(!w)throw Error("Allow pop-ups to print the roster.");
-  w.document.write("<!doctype html><html><head><title>CHELENQO Result Roster</title><style>body{font-family:Arial;padding:20px}h1,h2{text-align:center}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #999;padding:5px;text-align:center}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>CHELENQO SECONDARY SCHOOL</h1><h2>Student Result Roster</h2><p><b>Grade:</b> "+grade+" &nbsp; <b>Stream:</b> "+stream+" &nbsp; <b>Section:</b> "+section+"</p><table><thead><tr><th>Rank</th><th>Student ID</th><th>Student Name</th><th>Stream</th><th>Section</th>"+subjectHeaders+"<th>Total</th><th>Average</th><th>Percentage</th><th>Status</th></tr></thead><tbody>"+body+"</tbody></table><script>window.onload=()=>window.print();<\/script></body></html>");w.document.close();
+  w.document.write("<!doctype html><html><head><title>CHELENQO Result Roster</title><style>body{font-family:Arial;padding:20px}h1,h2{text-align:center}table{width:100%;border-collapse:collapse;font-size:10px}th,td{border:1px solid #999;padding:4px;text-align:center}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>CHELENQO SECONDARY SCHOOL</h1><h2>Student Result Roster</h2><p><b>Grade:</b> "+esc(grade)+" &nbsp; <b>Stream:</b> "+esc(stream)+" &nbsp; <b>Section:</b> "+esc(section)+"</p><table><thead><tr><th>Rank</th><th>Student ID</th><th>Student Name</th><th>Grade</th><th>Stream</th><th>Section</th>"+subjectHeaders+"<th>Overall Avg</th><th>Status</th></tr></thead><tbody>"+body+"</tbody></table><script>window.onload=()=>window.print();<\/script></body></html>");
+  w.document.close();
  }catch(err){message("resultsMessage",err.message||"Could not print roster.");}
-});
-$("downloadResultsXlsxButton").addEventListener("click",async()=>{
+});$("downloadResultsXlsxButton").addEventListener("click",async()=>{
  try{
   if(!window.XLSX)throw Error("The Excel export library did not load. Refresh the page and try again.");
   const rows=await getFilteredResultRows();if(!rows.length)throw Error("No results to export.");
   const {roster,subjects}=buildResultRoster(rows);
   const exportRows=roster.map(r=>{
    const out={"Rank":r.rank,"Student ID":r.student_code,"Student Name":r.full_name,"Grade":r.grade_level,"Stream":r.stream,"Section":r.section};
-   subjects.forEach(s=>out[s]=r.marks[s]);
-   out["Total"]=r.total;out["Average"]=r.average;out["Percentage"]=r.percentage/100;out["Status"]=r.status;return out;
+   subjects.forEach(s=>{
+    const x=r.subjectResults[s]||{};
+    out[s+" — Sem I Avg"]=x.semesterI==null?"":x.semesterI/100;
+    out[s+" — Sem II Avg"]=x.semesterII==null?"":x.semesterII/100;
+    out[s+" — Annual Avg"]=x.annual==null?"":x.annual/100;
+   });
+   out["Overall Avg"]=r.overall/100;
+   out["Status"]=r.status;
+   return out;
   });
-  const ws=XLSX.utils.json_to_sheet(exportRows);ws["!cols"]=[{wch:8},{wch:16},{wch:26},{wch:8},{wch:20},{wch:12},...subjects.map(()=>({wch:16})),{wch:12},{wch:12},{wch:14},{wch:14}];
+  const ws=XLSX.utils.json_to_sheet(exportRows);
+  const widths=[{wch:8},{wch:16},{wch:26},{wch:8},{wch:20},{wch:12}];
+  subjects.forEach(()=>widths.push({wch:16},{wch:16},{wch:16}));
+  widths.push({wch:14},{wch:30});
+  ws["!cols"]=widths;
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Result Roster");
-  const grade=getResultGradeValue(),section=$("resultSection").value.trim();
-  XLSX.writeFile(wb,"CHELENQO-Result-Roster-Grade-"+grade+(section?"-Section-"+section.replace(/[^A-Za-z0-9_-]/g,"_"):"")+".xlsx");
+  const grade=getResultGradeValue()||"All-Grades",section=$("resultSection").value.trim();
+  XLSX.writeFile(wb,"CHELENQO-Result-Roster-"+grade+(section?"-Section-"+section.replace(/[^A-Za-z0-9_-]/g,"_"):"")+".xlsx");
   message("resultsMessage",roster.length+" student roster row(s) exported to Excel.","success");
  }catch(err){message("resultsMessage",err.message||"Could not export roster.");}
 });
-$("clearResultFiltersButton").addEventListener("click",async()=>{
- $("resultGrade").value="";$("resultStream").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';$("resultSemester").value="";$("resultAcademicYear").value="";
- $("resultsSummary").textContent="";$("resultsList").textContent="";message("resultsMessage","Filters cleared.","muted");
-});
-$("closeExamPreviewButton").addEventListener("click",()=>$("examPreviewPanel").classList.add("hidden"));
-$("studentTab").addEventListener("click",()=>showPanel("studentPanel"));
-// Keep the administrator entry point available even if another initialization step is delayed.
-$("loginTab").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openLoginPanel();}});
-$("teacherTab").addEventListener("click",async()=>{if(await refreshAdmin()){await loadSubjects();await renderExamList();showPanel("teacherPanel");}else showPanel("loginPanel");});
-$("resultsTab").addEventListener("click",async()=>{showPanel("resultsPanel");await loadResultFilterOptions();});
-$("signOutTab").addEventListener("click",async()=>{await db.auth.signOut();setAdmin(false);showPanel("studentPanel");});
-db.auth.onAuthStateChange((event,session)=>{
- setTimeout(async()=>{
-  if(event==="PASSWORD_RECOVERY"){
-   showPanel("newPasswordPanel");
-   message("newPasswordMessage","Password recovery verified. Choose your new password.","success");
-   $("newPassword").focus();
-   return;
-  }
-  refreshAdmin();
-  try{await restoreVerifiedStudentSession();}catch(err){console.warn("Student session restore:",err.message);}
- },0);
-});
-setAdmin(false);showPanel("studentPanel");
-window.addEventListener("turnstileloaded",()=>{turnstileLoaded=true;initTurnstile();});
-window.addEventListener("load",()=>{
-  if(window.turnstile){turnstileLoaded=true;initTurnstile();}
-  else setTimeout(initTurnstile,500);
-});
-(async()=>{
- await refreshAdmin();
- try{await restoreVerifiedStudentSession();}catch(err){message("studentLoginMessage",err.message||"Could not restore student session.");}
-})();
-</script>
-</body>
-</html>
+
