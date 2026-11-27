@@ -200,6 +200,8 @@ window.onTurnstileLoad=function(){
 <div><label for="examSubject">Subject</label><select id="examSubject" required><option value="">Select grade first</option></select></div>
 <div><label for="examTitle">Examination title</label><input id="examTitle" required maxlength="200"></div>
 <div><label for="examDuration">Duration (minutes)</label><input id="examDuration" type="number" min="1" max="240" value="60" required></div>
+<div><label for="examSemester">Semester</label><select id="examSemester" required><option value="">Select semester</option><option value="Semester I">Semester I</option><option value="Semester II">Semester II</option></select></div>
+<div><label for="examAcademicYear">Academic year</label><input id="examAcademicYear" required maxlength="20" placeholder="2018 E.C."></div>
 </div>
 <h4>Choose how to add questions</h4>
 <div class="grid">
@@ -280,6 +282,18 @@ window.onTurnstileLoad=function(){
 <select id="resultExam">
 <option value="">All examinations</option>
 </select>
+</div>
+<div>
+<label for="resultSemester">Semester</label>
+<select id="resultSemester">
+<option value="">All semesters</option>
+<option value="Semester I">Semester I</option>
+<option value="Semester II">Semester II</option>
+</select>
+</div>
+<div>
+<label for="resultAcademicYear">Academic year</label>
+<input id="resultAcademicYear" maxlength="20" placeholder="e.g. 2018 E.C.">
 </div>
 </div>
 <div>
@@ -958,7 +972,7 @@ $("examForm").addEventListener("submit",async e=>{
  if(!valid){message("teacherMessage","Each question needs text, 2–6 options and a valid zero-based answer index.");return;}
  const payload=raw.map(q=>({question_text:q.question.trim(),options:q.options,correct_option:q.answer,marks:Number.isInteger(q.marks)&&q.marks>0?q.marks:1,explanation:q.explanation||null}));
  try{
-  const {data:id,error}=await db.rpc("create_teacher_exam",{p_title:$("examTitle").value.trim(),p_grade_level:Number($("examGrade").value),p_subject_id:$("examSubject").value,p_duration_minutes:Number($("examDuration").value),p_questions:payload});
+  const {data:id,error}=await db.rpc("create_teacher_exam_v2",{p_title:$("examTitle").value.trim(),p_grade_level:Number($("examGrade").value),p_subject_id:$("examSubject").value,p_duration_minutes:Number($("examDuration").value),p_semester:$("examSemester").value,p_academic_year:$("examAcademicYear").value.trim(),p_questions:payload});
   if(error)throw error;message("teacherMessage","Examination created as unpublished. Review and publish it below.","success");
   $("examForm").reset();fillSubjectOptions();await renderExamList();
  }catch(err){message("teacherMessage",err.message||"Exam creation failed.");}
@@ -1122,13 +1136,13 @@ async function renderExamList(){
  const box=$("examList");box.textContent="Loading…";
  try{
   if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
-  const {data,error}=await db.from("exams").select("id,title,grade_level,duration_minutes,total_marks,is_published,subject_id").order("created_at",{ascending:false});if(error)throw error;
+  const {data,error}=await db.from("exams").select("id,title,grade_level,duration_minutes,total_marks,is_published,subject_id,semester,academic_year").order("created_at",{ascending:false});if(error)throw error;
   const {data:subs,error:se}=await db.from("subjects").select("id,subject_name");if(se)throw se;
   const names=Object.fromEntries((subs||[]).map(s=>[s.id,s.subject_name]));box.innerHTML="";
   (data||[]).forEach(ex=>{
    const item=document.createElement("div");item.className="item";
    const title=document.createElement("strong");title.textContent=`Grade ${ex.grade_level} — ${names[ex.subject_id]||"Subject"}: ${ex.title}`;
-   const detail=document.createElement("p");detail.className="muted";detail.textContent=`${ex.duration_minutes} minutes | ${ex.total_marks} marks | ${ex.is_published?"Published":"Unpublished"}`;
+   const detail=document.createElement("p");detail.className="muted";detail.textContent=ex.duration_minutes+" minutes | "+ex.total_marks+" marks | "+(ex.semester||"Semester not set")+" | "+(ex.academic_year||"Academic year not set")+" | "+(ex.is_published?"Published":"Unpublished");
    item.append(title,detail);
    const previewBtn=document.createElement("button");
    previewBtn.type="button";
@@ -1182,99 +1196,42 @@ async function loadResultExams(){
  const select=$("resultExam");
  select.innerHTML='<option value="">All examinations</option>';
  try{
-  let query=db.from("exams").select("id,title,grade_level,subject_id").order("created_at",{ascending:false});
+  let query=db.from("exams").select("id,title,grade_level,subject_id,semester,academic_year").order("created_at",{ascending:false});
   if(grade)query=query.eq("grade_level",Number(grade));
   if(subject)query=query.eq("subject_id",subject);
   const {data,error}=await query;
   if(error)throw error;
   (data||[]).forEach(ex=>{
-   const o=document.createElement("option");o.value=ex.id;o.textContent=ex.title;select.append(o);
+   const o=document.createElement("option");o.value=ex.id;o.textContent=ex.title+(ex.semester?" — "+ex.semester:" — Semester not set")+(ex.academic_year?" — "+ex.academic_year:"");select.append(o);
   });
  }catch(err){message("resultsMessage",err.message||"Could not load examinations.");}
 }
 function buildResultRoster(rows){
- const subjectMap=new Map();
- const students=new Map();
+ const subjectMap=new Map(), students=new Map();
  for(const r of rows){
-  const key=r.student_id;
-  if(!key)continue;
-  if(!students.has(key))students.set(key,{
-   student_id:key,student_code:r.student_code||"",full_name:r.full_name||"",grade_level:r.grade_level,
-   stream:r.stream||"General",section:r.section||"",subjects:new Map()
-  });
-  const s=students.get(key);
-  const subjectKey=r.subject_id||r.subject_name||r.exam_id;
-  const previous=s.subjects.get(subjectKey);
-  const submittedTime=r.submitted_at?new Date(r.submitted_at).getTime():0;
-  const previousTime=previous?.submitted_at?new Date(previous.submitted_at).getTime():0;
-  if(!previous || submittedTime>=previousTime){
-   s.subjects.set(subjectKey,r);
-   if(r.subject_name)subjectMap.set(r.subject_id||r.subject_name,r.subject_name);
-  }
+  if(!r.student_id)continue;
+  if(!students.has(r.student_id))students.set(r.student_id,{student_id:r.student_id,student_code:r.student_code||"",full_name:r.full_name||"",grade_level:r.grade_level,stream:r.stream||"General",section:r.section||"",subjects:new Map()});
+  const st=students.get(r.student_id), key=r.subject_id||r.subject_name||r.exam_id;
+  if(!st.subjects.has(key))st.subjects.set(key,{semesterI:[],semesterII:[],other:[]});
+  const entry={score:Number(r.score)||0,totalMarks:Number(r.total_marks)||0,percentage:Number(r.percentage)||0};
+  if(r.semester==="Semester I")st.subjects.get(key).semesterI.push(entry);else if(r.semester==="Semester II")st.subjects.get(key).semesterII.push(entry);else st.subjects.get(key).other.push(entry);
+  if(r.subject_name)subjectMap.set(key,r.subject_name);
  }
  const subjects=[...subjectMap.entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
- const roster=[...students.values()].map(s=>{
-  let total=0,max=0,completed=0;
-  const marks={};
-  for(const [subjectId,subjectName] of subjects){
-   const r=s.subjects.get(subjectId);
-   if(r){
-    const score=Number(r.score);
-    const tm=Number(r.total_marks);
-    if(Number.isFinite(score)){total+=score;completed++;}
-    if(Number.isFinite(tm))max+=tm;
-    marks[subjectName]=Number.isFinite(score)?score:"—";
-   }else marks[subjectName]="—";
-  }
-  const percentage=max?Number(((total/max)*100).toFixed(2)):0;
-  return {...s,total, max, average:completed?Number((total/completed).toFixed(2)):0, percentage, completed, marks};
- });
- roster.sort((a,b)=>b.percentage-a.percentage || b.total-a.total || a.full_name.localeCompare(b.full_name));
- let lastPercent=null,lastRank=0;
- roster.forEach((r,i)=>{
-  if(lastPercent===null||r.percentage!==lastPercent)lastRank=i+1;
-  r.rank=lastRank;lastPercent=r.percentage;
-  r.status=r.completed===subjects.length&&subjects.length>0?"Complete":"Incomplete";
- });
+ const weightedAverage=list=>{if(!list.length)return null;const marks=list.reduce((a,x)=>a+x.totalMarks,0),score=list.reduce((a,x)=>a+x.score,0);return marks?Number(((score/marks)*100).toFixed(2)):null;};
+ const roster=[...students.values()].map(st=>{const subjectResults={},annualValues=[];for(const [id,name] of subjects){const b=st.subjects.get(id)||{semesterI:[],semesterII:[],other:[]};const i=weightedAverage(b.semesterI),ii=weightedAverage(b.semesterII);let annual=null;if(i!==null&&ii!==null)annual=Number(((i+ii)/2).toFixed(2));else if(i!==null)annual=i;else if(ii!==null)annual=ii;else if(b.other.length)annual=weightedAverage(b.other);if(annual!==null)annualValues.push(annual);subjectResults[name]={semesterI:i,semesterII:ii,annual,hasOther:b.other.length>0};}const overall=annualValues.length?Number((annualValues.reduce((a,b)=>a+b,0)/annualValues.length).toFixed(2)):0;const hasSemesterData=[...st.subjects.values()].some(b=>b.semesterI.length||b.semesterII.length);const hasUnassignedData=[...st.subjects.values()].some(b=>b.other.length);return {...st,subjectResults,overall,hasSemesterData,hasUnassignedData};});
+ roster.sort((a,b)=>b.overall-a.overall||a.full_name.localeCompare(b.full_name));let last=null,rank=0;roster.forEach((r,i)=>{if(last===null||r.overall!==last)rank=i+1;r.rank=rank;last=r.overall;r.status=r.overall>0?(r.hasSemesterData?(r.hasUnassignedData?"Complete (some exams untagged)":"Complete"):"Complete (semester not set)"):"No result";});
  return {roster,subjects:subjects.map(x=>x[1])};
 }
 async function getFilteredResultRows(){
  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
- const grade=getResultGradeValue();
- const section=$("resultSection").value.trim();
- const stream=$("resultStream").value||null;
- const subject=$("resultSubject").value||null;
- const exam=$("resultExam").value||null;
+ const grade=getResultGradeValue(),section=$("resultSection").value.trim(),stream=$("resultStream").value||null,subject=$("resultSubject").value||null,exam=$("resultExam").value||null,semester=$("resultSemester").value||null,academicYear=$("resultAcademicYear").value.trim()||null;
  if(!grade)throw Error("Select a grade.");
- const {data,error}=await db.rpc("get_admin_student_results",{
-  p_grade_level:Number(grade),p_section:section||null,p_stream:stream,p_subject_id:subject,p_exam_id:exam
- });
- if(error)throw error;
- return data||[];
+ const {data,error}=await db.rpc("get_admin_student_results_v2",{p_grade_level:Number(grade),p_section:section||null,p_stream:stream,p_subject_id:subject,p_exam_id:exam});if(error)throw error;
+ let rows=data||[];if(semester)rows=rows.filter(r=>r.semester===semester);if(academicYear)rows=rows.filter(r=>String(r.academic_year||"").trim().toLowerCase()===academicYear.toLowerCase());return rows;
 }
 async function renderResults(){
- const box=$("resultsList");box.textContent="Loading…";$("resultsSummary").textContent="";
- try{
-  const rows=await getFilteredResultRows();
-  if(!rows.length){box.textContent="No submitted or graded results match the selected filters.";return;}
-  const {roster,subjects}=buildResultRoster(rows);
-  $("resultsSummary").textContent="Students: "+roster.length+" | Subjects: "+subjects.length+" | Class average: "+(roster.length?(roster.reduce((a,b)=>a+b.percentage,0)/roster.length).toFixed(2):"0")+"% | Highest: "+(roster.length?roster[0].percentage.toFixed(2):"0")+"% | Lowest: "+(roster.length?roster[roster.length-1].percentage.toFixed(2):"0")+"%";
-  box.innerHTML="";
-  const table=document.createElement("table");table.style.width="100%";table.style.borderCollapse="collapse";table.style.marginTop="14px";
-  const headers=["Rank","Student ID","Student Name","Grade","Stream","Section",...subjects,"Total","Average","Percentage","Status"];
-  const thead=document.createElement("thead");const trh=document.createElement("tr");
-  headers.forEach(h=>{const th=document.createElement("th");th.textContent=h;th.style.padding="8px";th.style.borderBottom="2px solid #cbd5e1";th.style.textAlign="left";trh.append(th);});
-  thead.append(trh);table.append(thead);
-  const tbody=document.createElement("tbody");
-  roster.forEach(r=>{
-   const tr=document.createElement("tr");
-   const vals=[r.rank,r.student_code||"—",r.full_name||"—",r.grade_level,r.stream,r.section||"—",...subjects.map(s=>r.marks[s]),r.total,r.average.toFixed(2),r.percentage.toFixed(2)+"%",r.status];
-   vals.forEach(v=>{const td=document.createElement("td");td.textContent=String(v);td.style.padding="8px";td.style.borderBottom="1px solid #e2e8f0";tr.append(td);});
-   tbody.append(tr);
-  });
-  table.append(tbody);box.append(table);
- }catch(err){box.textContent="";message("resultsMessage",err.message||"Could not generate result roster.");}
-}
+ const box=$("resultsList");box.textContent="Loading…";$("resultsSummary").textContent="";try{const rows=await getFilteredResultRows();if(!rows.length){box.textContent="No submitted or graded results match the selected filters.";return;}const {roster,subjects}=buildResultRoster(rows);const avg=roster.length?roster.reduce((a,b)=>a+b.overall,0)/roster.length:0;$("resultsSummary").textContent="Students: "+roster.length+" | Subjects: "+subjects.length+" | Overall class average: "+avg.toFixed(2)+"% | Highest: "+(roster.length?roster[0].overall.toFixed(2):"0")+"% | Lowest: "+(roster.length?roster[roster.length-1].overall.toFixed(2):"0")+"%";box.innerHTML="";const table=document.createElement("table");table.style.width="100%";table.style.borderCollapse="collapse";table.style.marginTop="14px";const headers=["Rank","Student ID","Student Name","Grade","Stream","Section"];subjects.forEach(s=>headers.push(s+" — Sem I Avg",s+" — Sem II Avg",s+" — Annual Avg"));headers.push("Overall Avg","Status");const thead=document.createElement("thead"),trh=document.createElement("tr");headers.forEach(h=>{const th=document.createElement("th");th.textContent=h;th.style.padding="8px";th.style.borderBottom="2px solid #cbd5e1";th.style.textAlign="left";trh.append(th);});thead.append(trh);table.append(thead);const tbody=document.createElement("tbody");roster.forEach(r=>{const vals=[r.rank,r.student_code||"—",r.full_name||"—",r.grade_level,r.stream,r.section||"—"];subjects.forEach(s=>{const x=r.subjectResults[s]||{};vals.push(x.semesterI==null?"—":x.semesterI.toFixed(2)+"%");vals.push(x.semesterII==null?"—":x.semesterII.toFixed(2)+"%");vals.push(x.annual==null?"—":x.annual.toFixed(2)+"%");});vals.push(r.overall.toFixed(2)+"%",r.status);const tr=document.createElement("tr");vals.forEach(v=>{const td=document.createElement("td");td.textContent=String(v);td.style.padding="8px";td.style.borderBottom="1px solid #e2e8f0";tr.append(td);});tbody.append(tr);});table.append(tbody);box.append(table);}catch(err){box.textContent="";message("resultsMessage",err.message||"Could not generate result roster.");}}
 $("loadStudentRosterButton").addEventListener("click",loadStudentManagementRoster);
 $("studentManagementSearch").addEventListener("keydown",e=>{
  if(e.key==="Enter"){e.preventDefault();loadStudentManagementRoster();}
@@ -1311,7 +1268,7 @@ $("downloadResultsXlsxButton").addEventListener("click",async()=>{
  }catch(err){message("resultsMessage",err.message||"Could not export roster.");}
 });
 $("clearResultFiltersButton").addEventListener("click",async()=>{
- $("resultGrade").value="";$("resultStream").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';
+ $("resultGrade").value="";$("resultStream").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';$("resultSemester").value="";$("resultAcademicYear").value="";
  $("resultsSummary").textContent="";$("resultsList").textContent="";message("resultsMessage","Filters cleared.","muted");
 });
 $("closeExamPreviewButton").addEventListener("click",()=>$("examPreviewPanel").classList.add("hidden"));
