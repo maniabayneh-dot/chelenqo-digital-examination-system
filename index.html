@@ -157,7 +157,7 @@ window.onTurnstileLoad=function(){
 <p id="adminStatus" class="success"></p>
 <div id="adminOnlyTools">
 <h3>Create student accounts</h3>
-<p class="notice">Upload an Excel workbook (.xlsx or .xls) with columns: Student Name, Grade, Section, Stream. Grades 9–10 use General; Grades 11–12 use Natural Science or Social Science. You can upload up to 100 students per batch.</p>
+<p class="notice">Upload an Excel workbook (.xlsx or .xls) with columns: Student Name, Grade, Section, Stream, Age, Sex. Age and Sex are optional. Grades 9–10 use General; Grades 11–12 use Natural Science or Social Science. You can upload up to 100 students per batch.</p>
 <div class="item">
  <label for="studentExcelFile">Student Excel file</label>
  <input id="studentExcelFile" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
@@ -166,7 +166,7 @@ window.onTurnstileLoad=function(){
  <p id="studentExcelMessage" role="status" class="muted"></p>
 </div>
 <label for="studentBatchInput">Student list (review before creating accounts)</label>
-<textarea id="studentBatchInput" placeholder="Hana Bekele | 12 | Natural Science | A&#10;Dawit Kebede | 11 | Social Science | B&#10;Abdi Ali | 9 | General | A"></textarea>
+<textarea id="studentBatchInput" placeholder="Hana Bekele | 12 | Natural Science | A | 18 | Female&#10;Dawit Kebede | 11 | Social Science | B | 17 | Male&#10;Abdi Ali | 9 | General | A | 15 | Male"></textarea>
 <button id="createStudentAccountsButton" type="button" class="primary">Generate student IDs and temporary passwords</button>
 <p id="studentAccountsMessage" role="status"></p>
 <div id="studentAccountsPanel" class="hidden">
@@ -864,9 +864,9 @@ $("importWordButton").addEventListener("click",async()=>{
 
 $("downloadStudentTemplateButton").addEventListener("click",()=>{
  if(!window.XLSX){message("studentExcelMessage","Excel library did not load. Refresh the page and try again.");return;}
- const rows=[{"Student Name":"Hana Bekele","Grade":12,"Section":"A","Stream":"Natural Science"},{"Student Name":"Abdi Mohammed","Grade":9,"Section":"B","Stream":"General"}];
- const ws=XLSX.utils.json_to_sheet(rows,{header:["Student Name","Grade","Section","Stream"]});
- ws["!cols"]=[{wch:26},{wch:10},{wch:12},{wch:20}];
+ const rows=[{"Student Name":"Hana Bekele","Grade":12,"Section":"A","Stream":"Natural Science","Age":18,"Sex":"Female"},{"Student Name":"Abdi Mohammed","Grade":9,"Section":"B","Stream":"General","Age":15,"Sex":"Male"}];
+ const ws=XLSX.utils.json_to_sheet(rows,{header:["Student Name","Grade","Section","Stream","Age","Sex"]});
+ ws["!cols"]=[{wch:26},{wch:10},{wch:12},{wch:20},{wch:10},{wch:20}];
  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Students");
  XLSX.writeFile(wb,"CHELENQO-STUDENT-TEMPLATE.xlsx");
 });
@@ -911,15 +911,19 @@ $("createStudentAccountsButton").addEventListener("click",async()=>{
  const rows=[];
  for(let i=0;i<lines.length;i++){
   const parts=lines[i].split("|").map(x=>x.trim());
-  if(parts.length!==4||!parts[0]||!["9","10","11","12"].includes(parts[1])||!parts[2]||!parts[3]){
-   message("studentAccountsMessage","Line "+(i+1)+" is invalid. Use: Full Name | Grade | Stream | Section.");return;
+  if(![4,6].includes(parts.length)||!parts[0]||!["9","10","11","12"].includes(parts[1])||!parts[2]||!parts[3]){
+   message("studentAccountsMessage","Line "+(i+1)+" is invalid. Use: Full Name | Grade | Stream | Section | Age | Sex. Age and Sex may be blank.");return;
   }
+  const age=parts.length===6&&parts[4]!==""?Number(parts[4]):null;
+  const sex=parts.length===6&&parts[5]!==""?parts[5]:null;
+  if(age!==null&&(!Number.isInteger(age)||age<10||age>30)){message("studentAccountsMessage","Line "+(i+1)+" has an invalid age. Use 10–30.");return;}
+  if(sex!==null&&!["Female","Male","Prefer not to say"].includes(sex)){message("studentAccountsMessage","Line "+(i+1)+" has an invalid sex.");return;}
   const grade=Number(parts[1]);
   const allowedStreams=grade<=10?["General"]:["Natural Science","Social Science"];
   if(!allowedStreams.includes(parts[2])){
    message("studentAccountsMessage","Line "+(i+1)+" has an invalid stream. Grades 9–10 use General; Grades 11–12 use Natural Science or Social Science.");return;
   }
-  rows.push({full_name:parts[0],grade_level:grade,stream:parts[2],section:parts[3]});
+  rows.push({full_name:parts[0],grade_level:grade,stream:parts[2],section:parts[3],age,sex});
  }
  if(!confirm("Create "+rows.length+" CHELENQO student accounts?"))return;
  button.disabled=true;
@@ -930,9 +934,9 @@ $("createStudentAccountsButton").addEventListener("click",async()=>{
    throw Error(data?.error||"Student account creation did not complete.");
   }
   generatedStudentAccounts=data.credentials;
-  const headers=["Student ID","Full Name","Grade","Stream","Section","Temporary Password"];
+  const headers=["Student ID","Full Name","Grade","Stream","Section","Age","Sex","Temporary Password"];
   $("studentAccountsOutput").value=[headers.join("\\t"),...generatedStudentAccounts.map(r=>[
-   r.student_id,r.full_name,r.grade_level,r.stream||"General",r.section,r.temporary_password
+   r.student_id,r.full_name,r.grade_level,r.stream||"General",r.section,r.age??"",r.sex??"",r.temporary_password
   ].map(v=>String(v).replaceAll("\\t"," ")).join("\\t"))].join("\\n");
   $("studentAccountsPanel").classList.remove("hidden");
   $("studentBatchInput").value="";
@@ -954,10 +958,10 @@ $("downloadStudentAccountsButton").addEventListener("click",()=>{
  if(!window.XLSX){message("studentAccountsMessage","Excel library did not load. Copy the credentials list instead.");return;}
  const rows=generatedStudentAccounts.map(r=>({
   "Student ID":r.student_id,"Student Name":r.full_name,"Grade":r.grade_level,
-  "Section":r.section,"Stream":r.stream||"General","Temporary Password":r.temporary_password
+  "Section":r.section,"Stream":r.stream||"General","Age":r.age??"","Sex":r.sex??"","Temporary Password":r.temporary_password
  }));
  const ws=XLSX.utils.json_to_sheet(rows);
- ws["!cols"]=[{wch:18},{wch:26},{wch:10},{wch:12},{wch:20},{wch:22}];
+ ws["!cols"]=[{wch:18},{wch:26},{wch:10},{wch:12},{wch:20},{wch:10},{wch:20},{wch:22}];
  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Student Credentials");
  XLSX.writeFile(wb,"CHELENQO-STUDENT-CREDENTIALS.xlsx");
 });
@@ -983,7 +987,7 @@ async function loadStudentManagementRoster(){
  try{
   if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
   const {data,error}=await db.from("profiles")
-   .select("id,student_code,full_name,grade_level,stream,section,must_change_password,role")
+   .select("id,student_code,full_name,grade_level,stream,section,age,sex,must_change_password,role")
    .eq("school_id",REQUIRED_SCHOOL_ID)
    .eq("role","student")
    .order("student_code",{ascending:true});
@@ -1003,7 +1007,7 @@ async function loadStudentManagementRoster(){
   table.style.width="100%";
   table.style.borderCollapse="collapse";
   table.style.marginTop="12px";
-  const headers=["Student ID","Student Name","Grade","Stream","Section","Password Status","Action"];
+  const headers=["Student ID","Student Name","Grade","Stream","Section","Age","Sex","Password Status","Action"];
   const thead=document.createElement("thead");
   const hr=document.createElement("tr");
   headers.forEach(h=>{
@@ -1018,7 +1022,7 @@ async function loadStudentManagementRoster(){
   const tbody=document.createElement("tbody");
   students.forEach(s=>{
    const tr=document.createElement("tr");
-   const values=[s.student_code||"—",s.full_name||"—",s.grade_level||"—",s.stream||"General",s.section||"—",s.must_change_password?"Temporary password required":"Personal password set"];
+   const values=[s.student_code||"—",s.full_name||"—",s.grade_level||"—",s.stream||"General",s.section||"—",s.age??"—",s.sex||"—",s.must_change_password?"Temporary password required":"Personal password set"];
    values.forEach(v=>{
     const td=document.createElement("td");
     td.textContent=String(v);
@@ -1029,6 +1033,30 @@ async function loadStudentManagementRoster(){
    const actionTd=document.createElement("td");
    actionTd.style.padding="8px";
    actionTd.style.borderBottom="1px solid #e2e8f0";
+   const editBtn=document.createElement("button");
+   editBtn.type="button";
+   editBtn.className="secondary";
+   editBtn.textContent="Edit age/sex";
+   editBtn.addEventListener("click",async()=>{
+    const ageInput=prompt("Age (10–30). Leave blank to clear:",s.age==null?"":String(s.age));
+    if(ageInput===null)return;
+    const sexInput=prompt("Sex: Female, Male, or Prefer not to say. Leave blank to clear:",s.sex||"");
+    if(sexInput===null)return;
+    const age=ageInput.trim()===""?null:Number(ageInput.trim());
+    const sex=sexInput.trim()===""?null:sexInput.trim();
+    if(age!==null&&(!Number.isInteger(age)||age<10||age>30)){message("studentManagementMessage","Age must be a whole number from 10 to 30.");return;}
+    if(sex!==null&&!["Female","Male","Prefer not to say"].includes(sex)){message("studentManagementMessage","Sex must be Female, Male, or Prefer not to say.");return;}
+    try{
+      if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
+      const {error}=await db.rpc("admin_update_student_demographics",{p_student_id:s.id,p_age:age,p_sex:sex});
+      if(error)throw error;
+      s.age=age;s.sex=sex;
+      tr.children[5].textContent=age??"—";
+      tr.children[6].textContent=sex||"—";
+      message("studentManagementMessage","Age and sex updated for "+(s.student_code||"student")+".","success");
+    }catch(err){message("studentManagementMessage",err.message||"Could not update age and sex.");}
+   });
+   actionTd.append(editBtn);
    const resetBtn=document.createElement("button");
    resetBtn.type="button";
    resetBtn.className="danger";
@@ -1063,7 +1091,7 @@ async function loadStudentManagementRoster(){
      box.prepend(safe);
      message("studentManagementMessage","Password reset completed for "+(s.student_code||"student")+".","success");
      s.must_change_password=true;
-     tr.children[5].textContent="Temporary password required";
+     tr.children[7].textContent="Temporary password required";
     }catch(err){
      message("studentManagementMessage",err.message||"Could not reset the student's password.","error");
     }finally{resetBtn.disabled=false;}
@@ -1230,7 +1258,7 @@ async function getFilteredResultRows(){
  let rows=data||[];if(semester)rows=rows.filter(r=>r.semester===semester);if(academicYear)rows=rows.filter(r=>String(r.academic_year||"").trim().toLowerCase()===academicYear.toLowerCase());return rows;
 }
 async function renderResults(){
- const box=$("resultsList");box.textContent="Loading…";$("resultsSummary").textContent="";try{const rows=await getFilteredResultRows();if(!rows.length){box.textContent="No submitted or graded results match the selected filters.";return;}const {roster,subjects}=buildResultRoster(rows);const avg=roster.length?roster.reduce((a,b)=>a+b.overall,0)/roster.length:0;$("resultsSummary").textContent="Students: "+roster.length+" | Subjects: "+subjects.length+" | Overall class average: "+avg.toFixed(2)+"% | Highest: "+(roster.length?roster[0].overall.toFixed(2):"0")+"% | Lowest: "+(roster.length?roster[roster.length-1].overall.toFixed(2):"0")+"%";box.innerHTML="";const table=document.createElement("table");table.style.width="100%";table.style.borderCollapse="collapse";table.style.marginTop="14px";const headers=["Rank","Student ID","Student Name","Grade","Stream","Section"];subjects.forEach(s=>headers.push(s+" — Sem I Avg",s+" — Sem II Avg",s+" — Annual Avg"));headers.push("Overall Avg","Status");const thead=document.createElement("thead"),trh=document.createElement("tr");headers.forEach(h=>{const th=document.createElement("th");th.textContent=h;th.style.padding="8px";th.style.borderBottom="2px solid #cbd5e1";th.style.textAlign="left";trh.append(th);});thead.append(trh);table.append(thead);const tbody=document.createElement("tbody");roster.forEach(r=>{const vals=[r.rank,r.student_code||"—",r.full_name||"—",r.grade_level,r.stream,r.section||"—"];subjects.forEach(s=>{const x=r.subjectResults[s]||{};vals.push(x.semesterI==null?"—":x.semesterI.toFixed(2)+"%");vals.push(x.semesterII==null?"—":x.semesterII.toFixed(2)+"%");vals.push(x.annual==null?"—":x.annual.toFixed(2)+"%");});vals.push(r.overall.toFixed(2)+"%",r.status);const tr=document.createElement("tr");vals.forEach(v=>{const td=document.createElement("td");td.textContent=String(v);td.style.padding="8px";td.style.borderBottom="1px solid #e2e8f0";tr.append(td);});tbody.append(tr);});table.append(tbody);box.append(table);}catch(err){box.textContent="";message("resultsMessage",err.message||"Could not generate result roster.");}}
+ const box=$("resultsList");box.textContent="Loading…";$("resultsSummary").textContent="";try{const rows=await getFilteredResultRows();if(!rows.length){box.textContent="No submitted or graded results match the selected filters.";return;}const {roster,subjects}=buildResultRoster(rows);const avg=roster.length?roster.reduce((a,b)=>a+b.overall,0)/roster.length:0;$("resultsSummary").textContent="Students: "+roster.length+" | Subjects: "+subjects.length+" | Overall class average: "+avg.toFixed(2)+"% | Highest: "+(roster.length?roster[0].overall.toFixed(2):"0")+"% | Lowest: "+(roster.length?roster[roster.length-1].overall.toFixed(2):"0")+"%";box.innerHTML="";const table=document.createElement("table");table.style.width="100%";table.style.borderCollapse="collapse";table.style.marginTop="14px";const headers=["Rank","Student ID","Student Name","Age","Sex","Grade","Stream","Section"];subjects.forEach(s=>headers.push(s+" — Sem I Avg",s+" — Sem II Avg",s+" — Annual Avg"));headers.push("Overall Avg","Status");const thead=document.createElement("thead"),trh=document.createElement("tr");headers.forEach(h=>{const th=document.createElement("th");th.textContent=h;th.style.padding="8px";th.style.borderBottom="2px solid #cbd5e1";th.style.textAlign="left";trh.append(th);});thead.append(trh);table.append(thead);const tbody=document.createElement("tbody");roster.forEach(r=>{const vals=[r.rank,r.student_code||"—",r.full_name||"—",r.age??"—",r.sex||"—",r.grade_level,r.stream,r.section||"—"];subjects.forEach(s=>{const x=r.subjectResults[s]||{};vals.push(x.semesterI==null?"—":x.semesterI.toFixed(2)+"%");vals.push(x.semesterII==null?"—":x.semesterII.toFixed(2)+"%");vals.push(x.annual==null?"—":x.annual.toFixed(2)+"%");});vals.push(r.overall.toFixed(2)+"%",r.status);const tr=document.createElement("tr");vals.forEach(v=>{const td=document.createElement("td");td.textContent=String(v);td.style.padding="8px";td.style.borderBottom="1px solid #e2e8f0";tr.append(td);});tbody.append(tr);});table.append(tbody);box.append(table);}catch(err){box.textContent="";message("resultsMessage",err.message||"Could not generate result roster.");}}
 $("loadStudentRosterButton").addEventListener("click",loadStudentManagementRoster);
 $("studentManagementSearch").addEventListener("keydown",e=>{
  if(e.key==="Enter"){e.preventDefault();loadStudentManagementRoster();}
@@ -1250,10 +1278,10 @@ $("printResultsButton").addEventListener("click",async()=>{
     const x=r.subjectResults[s]||{};
     return "<td>"+(x.semesterI==null?"—":x.semesterI.toFixed(2)+"%")+"</td><td>"+(x.semesterII==null?"—":x.semesterII.toFixed(2)+"%")+"</td><td>"+(x.annual==null?"—":x.annual.toFixed(2)+"%")+"</td>";
    }).join("");
-   return "<tr><td>"+r.rank+"</td><td>"+esc(r.student_code||"—")+"</td><td>"+esc(r.full_name||"—")+"</td><td>"+r.grade_level+"</td><td>"+esc(r.stream)+"</td><td>"+esc(r.section||"—")+"</td>"+cells+"<td>"+r.overall.toFixed(2)+"%</td><td>"+esc(r.status)+"</td></tr>";
+   return "<tr><td>"+r.rank+"</td><td>"+esc(r.student_code||"—")+"</td><td>"+esc(r.full_name||"—")+"</td><td>"+esc(r.age??"—")+"</td><td>"+esc(r.sex||"—")+"</td><td>"+r.grade_level+"</td><td>"+esc(r.stream)+"</td><td>"+esc(r.section||"—")+"</td>"+cells+"<td>"+r.overall.toFixed(2)+"%</td><td>"+esc(r.status)+"</td></tr>";
   }).join("");
   const w=window.open("","_blank");if(!w)throw Error("Allow pop-ups to print the roster.");
-  w.document.write("<!doctype html><html><head><title>CHELENQO Result Roster</title><style>body{font-family:Arial;padding:20px}h1,h2{text-align:center}table{width:100%;border-collapse:collapse;font-size:10px}th,td{border:1px solid #999;padding:4px;text-align:center}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>CHELENQO SECONDARY SCHOOL</h1><h2>Student Result Roster</h2><p><b>Grade:</b> "+esc(grade)+" &nbsp; <b>Stream:</b> "+esc(stream)+" &nbsp; <b>Section:</b> "+esc(section)+"</p><table><thead><tr><th>Rank</th><th>Student ID</th><th>Student Name</th><th>Grade</th><th>Stream</th><th>Section</th>"+subjectHeaders+"<th>Overall Avg</th><th>Status</th></tr></thead><tbody>"+body+"</tbody></table><script>window.onload=()=>window.print();<\/script></body></html>");
+  w.document.write("<!doctype html><html><head><title>CHELENQO Result Roster</title><style>body{font-family:Arial;padding:20px}h1,h2{text-align:center}table{width:100%;border-collapse:collapse;font-size:10px}th,td{border:1px solid #999;padding:4px;text-align:center}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>CHELENQO SECONDARY SCHOOL</h1><h2>Student Result Roster</h2><p><b>Grade:</b> "+esc(grade)+" &nbsp; <b>Stream:</b> "+esc(stream)+" &nbsp; <b>Section:</b> "+esc(section)+"</p><table><thead><tr><th>Rank</th><th>Student ID</th><th>Student Name</th><th>Age</th><th>Sex</th><th>Grade</th><th>Stream</th><th>Section</th>"+subjectHeaders+"<th>Overall Avg</th><th>Status</th></tr></thead><tbody>"+body+"</tbody></table><script>window.onload=()=>window.print();<\/script></body></html>");
   w.document.close();
  }catch(err){message("resultsMessage",err.message||"Could not print roster.");}
 });$("downloadResultsXlsxButton").addEventListener("click",async()=>{
@@ -1262,7 +1290,7 @@ $("printResultsButton").addEventListener("click",async()=>{
   const rows=await getFilteredResultRows();if(!rows.length)throw Error("No results to export.");
   const {roster,subjects}=buildResultRoster(rows);
   const exportRows=roster.map(r=>{
-   const out={"Rank":r.rank,"Student ID":r.student_code,"Student Name":r.full_name,"Grade":r.grade_level,"Stream":r.stream,"Section":r.section};
+   const out={"Rank":r.rank,"Student ID":r.student_code,"Student Name":r.full_name,"Age":r.age??"","Sex":r.sex||"","Grade":r.grade_level,"Stream":r.stream,"Section":r.section};
    subjects.forEach(s=>{
     const x=r.subjectResults[s]||{};
     out[s+" — Sem I Avg"]=x.semesterI==null?"":x.semesterI/100;
@@ -1274,7 +1302,7 @@ $("printResultsButton").addEventListener("click",async()=>{
    return out;
   });
   const ws=XLSX.utils.json_to_sheet(exportRows);
-  const widths=[{wch:8},{wch:16},{wch:26},{wch:8},{wch:20},{wch:12}];
+  const widths=[{wch:8},{wch:16},{wch:26},{wch:10},{wch:20},{wch:8},{wch:20},{wch:12}];
   subjects.forEach(()=>widths.push({wch:16},{wch:16},{wch:16}));
   widths.push({wch:14},{wch:30});
   ws["!cols"]=widths;
