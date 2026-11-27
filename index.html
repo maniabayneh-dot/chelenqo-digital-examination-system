@@ -229,6 +229,17 @@ window.onTurnstileLoad=function(){
 <button class="primary">Create examination</button><p id="teacherMessage" role="status"></p>
 </form>
 <hr><h3>Examinations</h3><div id="examList"></div>
+<div id="examPreviewPanel" class="card hidden" style="margin-top:16px">
+  <div class="topline">
+    <div>
+      <h3 id="examPreviewTitle" style="margin-bottom:4px">Exam Preview</h3>
+      <p id="examPreviewMeta" class="muted" style="margin-top:0"></p>
+    </div>
+    <button id="closeExamPreviewButton" type="button" class="secondary">Close Preview</button>
+  </div>
+  <p class="notice">Administrator preview only. This does not start a student attempt, does not submit answers, and does not create a result.</p>
+  <div id="examPreviewQuestions"></div>
+</div>
 </section>
 
 <section id="resultsPanel" class="card hidden">
@@ -1052,9 +1063,61 @@ async function loadStudentManagementRoster(){
   message("studentManagementMessage",err.message||"Could not load the student roster.","error");
  }
 }
+async function previewExam(ex){
+ try{
+  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
+  const panel=$("examPreviewPanel");
+  const questionsBox=$("examPreviewQuestions");
+  questionsBox.textContent="Loading questions…";
+  $("examPreviewTitle").textContent=ex.title||"Exam Preview";
+  $("examPreviewMeta").textContent=`Grade ${ex.grade_level} | ${ex.duration_minutes} minutes | ${ex.total_marks} marks | ${ex.is_published?"Published":"Unpublished"}`;
+  panel.classList.remove("hidden");
+  panel.scrollIntoView({behavior:"smooth",block:"start"});
+  const {data:q,error}=await db.from("exam_questions")
+   .select("id,question_text,options,correct_option,marks,explanation,question_order")
+   .eq("exam_id",ex.id).order("question_order");
+  if(error)throw error;
+  if(!q?.length){questionsBox.textContent="This examination has no questions.";return;}
+  questionsBox.innerHTML="";
+  q.forEach((question,index)=>{
+   const card=document.createElement("div");
+   card.className="item";
+   const heading=document.createElement("strong");
+   heading.textContent=`Question ${index+1} (${Number(question.marks)||1} mark${Number(question.marks)||1===1?"":"s"})`;
+   const text=document.createElement("p");
+   text.className="question";
+   text.textContent=question.question_text||"";
+   const options=document.createElement("div");
+   (Array.isArray(question.options)?question.options:[]).forEach((option,i)=>{
+    const row=document.createElement("div");
+    row.className="option";
+    row.style.cursor="default";
+    row.textContent=`${String.fromCharCode(65+i)}. ${option}`;
+    if(i===Number(question.correct_option)){
+     row.classList.add("success");
+     row.style.fontWeight="700";
+     row.textContent+= "  ✓ Correct answer";
+    }
+    options.append(row);
+   });
+   card.append(heading,text,options);
+   if(question.explanation){
+    const explanation=document.createElement("p");
+    explanation.className="muted";
+    explanation.innerHTML="<strong>Explanation:</strong> ";
+    explanation.append(document.createTextNode(String(question.explanation)));
+    card.append(explanation);
+   }
+   questionsBox.append(card);
+  });
+ }catch(err){
+  $("examPreviewQuestions").textContent=err.message||"Could not load exam questions.";
+ }
+}
 async function renderExamList(){
  const box=$("examList");box.textContent="Loading…";
  try{
+  if(currentRole!=="admin"||!await refreshAdmin())throw Error("Administrator sign-in required.");
   const {data,error}=await db.from("exams").select("id,title,grade_level,duration_minutes,total_marks,is_published,subject_id").order("created_at",{ascending:false});if(error)throw error;
   const {data:subs,error:se}=await db.from("subjects").select("id,subject_name");if(se)throw se;
   const names=Object.fromEntries((subs||[]).map(s=>[s.id,s.subject_name]));box.innerHTML="";
@@ -1063,6 +1126,12 @@ async function renderExamList(){
    const title=document.createElement("strong");title.textContent=`Grade ${ex.grade_level} — ${names[ex.subject_id]||"Subject"}: ${ex.title}`;
    const detail=document.createElement("p");detail.className="muted";detail.textContent=`${ex.duration_minutes} minutes | ${ex.total_marks} marks | ${ex.is_published?"Published":"Unpublished"}`;
    item.append(title,detail);
+   const previewBtn=document.createElement("button");
+   previewBtn.type="button";
+   previewBtn.className="primary";
+   previewBtn.textContent="Preview Exam";
+   previewBtn.addEventListener("click",()=>previewExam(ex));
+   item.append(previewBtn);
    const btn=document.createElement("button");btn.type="button";btn.className=ex.is_published?"secondary":"primary";btn.textContent=ex.is_published?"Unpublish":"Publish";
    btn.addEventListener("click",async()=>{
     try{const {error}=await db.rpc("publish_teacher_exam",{p_exam_id:ex.id,p_publish:!ex.is_published});if(error)throw error;await renderExamList();}
@@ -1241,6 +1310,7 @@ $("clearResultFiltersButton").addEventListener("click",async()=>{
  $("resultGrade").value="";$("resultStream").value="";$("resultSection").value="";$("resultSubject").value="";$("resultExam").innerHTML='<option value="">All examinations</option>';
  $("resultsSummary").textContent="";$("resultsList").textContent="";message("resultsMessage","Filters cleared.","muted");
 });
+$("closeExamPreviewButton").addEventListener("click",()=>$("examPreviewPanel").classList.add("hidden"));
 $("studentTab").addEventListener("click",()=>showPanel("studentPanel"));
 // Keep the administrator entry point available even if another initialization step is delayed.
 $("loginTab").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openLoginPanel();}});
