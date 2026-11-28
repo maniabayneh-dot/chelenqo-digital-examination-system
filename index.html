@@ -399,25 +399,49 @@ function renderTurnstile(kind,el){
 }
 
 function initTurnstile(){
-  const studentEl=$( "studentCaptcha" );
-  const staffEl=$( "staffCaptcha" );
-  const studentVisible=$( "studentPanel" ) && !$( "studentPanel" ).classList.contains("hidden");
-  const staffVisible=$( "loginPanel" ) && !$( "loginPanel" ).classList.contains("hidden");
+  const studentEl=$("studentCaptcha");
+  const staffEl=$("staffCaptcha");
+  const studentVisible=$("studentPanel") && !$("studentPanel").classList.contains("hidden");
+  const staffVisible=$("loginPanel") && !$("loginPanel").classList.contains("hidden");
 
   if(!studentVisible && !staffVisible)return;
 
   if(!window.turnstile){
-    if(studentVisible && studentEl)studentEl.innerHTML='<div class="captcha-status">'+turnstileStatusText("student")+'</div>';
-    if(staffVisible && staffEl)staffEl.innerHTML='<div class="captcha-status">'+turnstileStatusText("staff")+'</div>';
+    const status='<div class="captcha-status">Loading Cloudflare security verification…</div>';
+    if(studentVisible && studentEl)studentEl.innerHTML=status;
+    if(staffVisible && staffEl)staffEl.innerHTML=status;
     return;
   }
 
   if(studentVisible && studentEl && !studentCaptchaWidget){
+    studentEl.innerHTML="";
     studentCaptchaWidget=renderTurnstile("student",studentEl);
   }
   if(staffVisible && staffEl && !staffCaptchaWidget){
+    staffEl.innerHTML="";
     staffCaptchaWidget=renderTurnstile("staff",staffEl);
   }
+}
+
+function ensureTurnstileLoaded(){
+  if(window.turnstile){initTurnstile();return;}
+  initTurnstile();
+  let attempts=0;
+  const timer=setInterval(function(){
+    attempts++;
+    if(window.turnstile){
+      clearInterval(timer);
+      initTurnstile();
+    }else if(attempts>=30){
+      clearInterval(timer);
+      if($("studentCaptcha") && !$("studentCaptcha").querySelector("iframe")){
+        showTurnstileFailure("student","turnstile-script-not-loaded");
+      }
+      if($("staffCaptcha") && !$("staffCaptcha").querySelector("iframe")){
+        showTurnstileFailure("staff","turnstile-script-not-loaded");
+      }
+    }
+  },500);
 }
 
 function openLoginPanel(){
@@ -426,9 +450,9 @@ function openLoginPanel(){
   if(email)email.focus();
   // The staff CAPTCHA is intentionally rendered only after the login panel
   // becomes visible.
-  setTimeout(initTurnstile,50);
+  setTimeout(ensureTurnstileLoaded,50);
   setTimeout(function(){
-    if(!staffCaptchaWidget && window.turnstile) initTurnstile();
+    if(!staffCaptchaWidget) ensureTurnstileLoaded();
   },1000);
 }
 
