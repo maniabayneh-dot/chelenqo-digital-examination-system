@@ -36,6 +36,7 @@ footer{text-align:center;color:var(--muted);padding:20px;font-size:13px}
   <form id="loginForm">
     <label for="email">Administrator email</label><input id="email" type="email" autocomplete="username" required>
     <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+    <div id="loginCaptcha" style="margin:12px 0" class="cf-turnstile" data-sitekey="0x4AAAAAAGCCoGUVEAouz5uS" data-callback="onLoginCaptchaSuccess" data-expired-callback="onLoginCaptchaExpired" data-error-callback="onLoginCaptchaError"></div>
     <button id="loginButton" type="submit" style="width:100%;margin-top:18px">Sign in</button>
   </form>
   <p id="loginMessage" class="message" role="alert" aria-live="polite"></p>
@@ -49,7 +50,7 @@ footer{text-align:center;color:var(--muted);padding:20px;font-size:13px}
   <form id="forgotPasswordForm">
     <label for="resetEmail">Administrator email</label>
     <input id="resetEmail" type="email" autocomplete="email" required>
-    <div id="resetCaptcha" style="margin:12px 0" class="cf-turnstile" data-sitekey="0x4AAAAAAGQysG7wwdtiwE5K" data-callback="onResetCaptchaSuccess" data-expired-callback="onResetCaptchaExpired" data-error-callback="onResetCaptchaError"></div>
+    <div id="resetCaptcha" style="margin:12px 0" class="cf-turnstile" data-sitekey="0x4AAAAAAGCCoGUVEAouz5uS" data-callback="onResetCaptchaSuccess" data-expired-callback="onResetCaptchaExpired" data-error-callback="onResetCaptchaError"></div>
   <button id="sendResetButton" type="submit" style="width:100%;margin-top:12px">Send reset email</button>
   </form>
   <p id="resetRequestMessage" class="message" role="alert" aria-live="polite"></p>
@@ -105,7 +106,10 @@ const SUPABASE_URL="https://yqwbdpsbtugunmtbvito.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_fV-728OBBlzFUn3QVu3oDA_K7rQBzCw";
 const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id);
-let allStudents=[];let visibleStudents=[];let resetCaptchaToken="";
+let allStudents=[];let visibleStudents=[];let resetCaptchaToken="";let loginCaptchaToken="";
+function onLoginCaptchaSuccess(token){loginCaptchaToken=token||"";}
+function onLoginCaptchaExpired(){loginCaptchaToken="";}
+function onLoginCaptchaError(){loginCaptchaToken="";}
 function onResetCaptchaSuccess(token){resetCaptchaToken=token||"";}
 function onResetCaptchaExpired(){resetCaptchaToken="";}
 function onResetCaptchaError(){resetCaptchaToken="";}
@@ -247,7 +251,8 @@ client.auth.onAuthStateChange((event)=>{
 $("loginForm").addEventListener("submit",async event=>{
   event.preventDefault();const button=$("loginButton");button.disabled=true;button.textContent="Signing in...";
   try{
-    const {data,error}=await client.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+    if(!loginCaptchaToken)throw new Error("Please complete the CAPTCHA verification first.");
+    const {data,error}=await client.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value,options:{captchaToken:loginCaptchaToken}});
     if(error||!data.user)throw new Error("Sign-in failed. Check your email and password.");
     await verifyAndShow(data.user);
   }catch(error){showLogin(error.message||"Unable to sign in.");}
