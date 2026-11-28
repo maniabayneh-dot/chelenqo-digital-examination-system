@@ -47,7 +47,7 @@ window.onTurnstileLoad=function(){
 </header>
 <nav>
 <button id="studentTab" type="button">Student Examination</button>
-<button id="loginTab" type="button" class="secondary" aria-controls="loginPanel">Administrator Sign-in</button>
+<button id="loginTab" type="button" class="secondary" aria-controls="loginPanel" onclick="document.getElementById('studentPanel').classList.add('hidden');document.getElementById('loginPanel').classList.remove('hidden');setTimeout(function(){if(typeof openLoginPanel==='function')openLoginPanel();},0)">Administrator Sign-in</button>
 <button id="teacherTab" type="button" class="secondary hidden">Teacher / Admin Dashboard</button>
 <button id="resultsTab" type="button" class="secondary hidden">Results</button>
 <button id="signOutTab" type="button" class="danger hidden">Sign out</button>
